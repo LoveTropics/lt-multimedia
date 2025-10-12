@@ -1,0 +1,10 @@
+# IDEA
+.idea/
+out/
+
+# Gradle
+build/
+.gradle/
+
+# Minecraft
+run/
