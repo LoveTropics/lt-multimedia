@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "package": "org.lovetropics.multimedia.mod.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+  ],
+  "client": [
+    "client.GameRendererMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "minVersion": "0.8"
+}
