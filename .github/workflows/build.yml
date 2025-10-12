@@ -105,6 +105,11 @@ jobs:
         with:
           java_arch: x64
 
+      - name: Build mod with Gradle
+        env:
+          CROSS_PLATFORM_BUILD: true
+        run: ./gradlew :build
+
       - name: Publish library with Gradle
         env:
           CROSS_PLATFORM_BUILD: true
@@ -112,3 +117,18 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
         run: ./gradlew :lib:build :lib:publish
+
+      - name: Locate built JARfile
+        id: jar
+        run: echo "jarfile=$(find build/libs/ -name "*.jar" -not -name "*slim*" -not -name "*source*")" >> $GITHUB_OUTPUT
+
+      - name: Set Artifact name
+        id: jarname
+        run: echo "jarname=$(find build/libs/ -name "*.jar" -not -name "*slim*" -not -name "*source*" | sed 's:.*/::')" >> $GITHUB_OUTPUT
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.jarname.outputs.jarname }}
+          path: ${{ steps.jar.outputs.jarfile }}
+          retention-days: 90
