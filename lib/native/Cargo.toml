@@ -1,0 +1,26 @@
+[package]
+name = "multimedia"
+version = "0.1.0"
+edition = "2024"
+
+[profile.release]
+strip = "debuginfo"
+opt-level = "s"
+lto = true
+
+[lib]
+name = "multimedia"
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+crossbeam-utils = "0.8.21"
+jni = "0.21.1"
+thiserror = "2.0.17"
+
+[dependencies.ffmpeg-next]
+version = "8.0.0"
+default-features = false
+features = ["build", "static", "codec", "format", "software-resampling", "software-scaling"]
+
+[patch.crates-io]
+ffmpeg-sys-next = { git = "https://github.com/LoveTropics/rust-ffmpeg-sys.git" }

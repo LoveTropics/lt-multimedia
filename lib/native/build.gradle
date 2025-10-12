@@ -1,0 +1,46 @@
+import org.lovetropics.multimedia.NativeBuildPlatform
+
+plugins {
+    id 'java-library'
+}
+
+version = rootProject.ext.libVersion
+
+final def env = System.getenv()
+final def buildArch = env.BUILD_ARCH ?: System.getProperty('os.arch')
+final def buildTarget = env.BUILD_TARGET
+
+final def platform = NativeBuildPlatform.detect(buildArch)
+
+final def cargoTargetDir = project.layout.buildDirectory.dir('cargo')
+
+tasks.register('buildNatives', Exec) {
+    environment 'CARGO_TARGET_DIR', cargoTargetDir.get().asFile.absolutePath
+
+    inputs.dir 'src'
+    inputs.files 'Cargo.toml'
+    outputs.dir cargoTargetDir.map {
+        buildTarget ? it.dir(buildTarget).dir('release') : it.dir('release')
+    }
+
+    def command = ['cargo', 'build', '--release']
+    if (buildTarget) {
+        command += ['--target', buildTarget]
+    }
+
+    commandLine command
+}
+
+tasks.withType(Jar).configureEach {
+    dependsOn 'buildNatives'
+    archiveBaseName = 'multimedia-lib'
+    archiveClassifier = "native-${platform.classifier}"
+
+    from buildNatives.outputs
+
+    include '*.dll', '*.dylib', '*.so'
+    rename "(.+)\\.(.+)", "\$1-${platform.classifier}\\.\$2"
+
+    from rootProject.layout.projectDirectory.file('LICENSE')
+    include 'LICENSE'
+}

@@ -1,0 +1,67 @@
+import org.lovetropics.multimedia.NativeBuildPlatform
+
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+group = group_id
+version = rootProject.ext.libVersion
+
+base {
+    archivesName = 'multimedia-lib'
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    withSourcesJar()
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly "org.jspecify:jspecify:$jspecify_version"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+evaluationDependsOnChildren()
+
+final def env = System.getenv()
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            artifactId 'multimedia-lib'
+            if (env.CROSS_PLATFORM_BUILD) {
+                NativeBuildPlatform.values().each { final platform ->
+                    final def nativeFile = platform.getArtifactFile(rootProject.layout.projectDirectory, 'multimedia-lib', project.version)
+                    artifact(nativeFile) {
+                        classifier = "native-$platform.classifier"
+                    }
+                }
+            } else {
+                artifact project('native').tasks.named('jar')
+            }
+        }
+    }
+
+    repositories {
+        if (env.MAVEN_URL) {
+            maven {
+                credentials {
+                    username env.MAVEN_USERNAME
+                    password env.MAVEN_PASSWORD
+                }
+                url env.MAVEN_URL
+            }
+        } else {
+            mavenLocal()
+        }
+    }
+}

@@ -1,0 +1,32 @@
+name: Build Natives (MacOS)
+inputs:
+  arch:
+    required: true
+  target:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install requirements
+      run: |
+        brew install nasm
+        rustup target add ${{ inputs.target }}
+      shell: bash
+
+    - uses: ./.github/workflows/common/java-and-gradle
+      with:
+        java_arch: aarch64
+
+    - name: Execute Gradle build
+      env:
+        BUILD_ARCH: ${{ inputs.arch }}
+        BUILD_TARGET: ${{ inputs.target }}
+      run: ./gradlew :lib:native:build
+      shell: bash
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: natives-${{ runner.os }}-${{ matrix.arch }}
+        path: lib/native/build/libs/

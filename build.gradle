@@ -1,0 +1,37 @@
+import org.lovetropics.multimedia.NativeBuildPlatform
+
+plugins {
+    id 'idea'
+    id 'java-library'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+group = group_id
+version = mod_version
+
+def env = System.getenv()
+if (env.GITHUB_RUN_NUMBER) {
+    version = "$mod_version.${env.GITHUB_RUN_NUMBER}"
+} else {
+    version = "$mod_version.0-SNAPSHOT"
+}
+
+ext {
+    if (env.GITHUB_RUN_NUMBER) {
+        libVersion = "$project.lib_version.${env.GITHUB_RUN_NUMBER}"
+    } else {
+        libVersion = "$project.lib_version.0-SNAPSHOT"
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}

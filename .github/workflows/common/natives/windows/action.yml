@@ -1,0 +1,53 @@
+name: Build Natives (Windows)
+inputs:
+  arch:
+    required: true
+  target:
+    required: true
+  msvc_arch:
+    required: true
+
+runs:
+  using: composite
+
+  steps:
+    - uses: msys2/setup-msys2@v2
+      with:
+        path-type: inherit
+        update: true
+        install: >-
+          make
+          yasm
+          diffutils
+          perl
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: ${{ inputs.msvc_arch }}
+
+    - name: Configure toolchain
+      run: |
+        rustup target add ${{ inputs.target }}
+        mv /usr/bin/link.exe /usr/bin/notthislink.exe
+        wget https://raw.githubusercontent.com/FFmpeg/gas-preprocessor/master/gas-preprocessor.pl
+        chmod +x gas-preprocessor.pl
+        mv gas-preprocessor.pl /usr/bin
+      shell: msys2 {0}
+
+    - uses: ./.github/workflows/common/java-and-gradle
+      with:
+        java_arch: x64
+
+    - name: Execute Gradle build
+      env:
+        BUILD_ARCH: ${{ inputs.arch }}
+        BUILD_TARGET: ${{ inputs.target }}
+      run: ./gradlew :lib:native:build
+      shell: msys2 {0}
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: natives-${{ runner.os }}-${{ matrix.arch }}
+        path: lib/native/build/libs/

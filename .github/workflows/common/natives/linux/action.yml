@@ -1,0 +1,42 @@
+name: Build Natives (Linux)
+inputs:
+  arch:
+    required: true
+  target:
+    required: true
+  gcc_triplet:
+    default: ''
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Install requirements
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y nasm
+        rustup target add ${{ inputs.target }}
+      shell: bash
+
+    - name: Install cross toolchain
+      if: inputs.gcc_triplet != ''
+      run: |
+        sudo apt-get install -y gcc-${{ inputs.gcc_triplet }}
+      shell: bash
+
+    - uses: ./.github/workflows/common/java-and-gradle
+      with:
+        java_arch: x64
+
+    - name: Execute Gradle build
+      env:
+        BUILD_ARCH: ${{ inputs.arch }}
+        BUILD_TARGET: ${{ inputs.target }}
+      run: ./gradlew :lib:native:build
+      shell: bash
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: natives-${{ runner.os }}-${{ matrix.arch }}
+        path: lib/native/build/libs/
