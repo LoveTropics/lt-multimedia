@@ -7,7 +7,9 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.fml.loading.FMLPaths;
+import net.neoforged.neoforge.common.NeoForge;
 import org.lovetropics.multimedia.mod.client.cache.MediaFileCache;
+import org.lovetropics.multimedia.mod.client.slideshow.SlideshowManager;
 
 import javax.annotation.Nullable;
 import java.util.Objects;
@@ -18,6 +20,8 @@ public class MultimediaMod {
 
     @Nullable
     private static MediaFileCache mediaCache;
+    @Nullable
+    private static SlideshowManager slideshowManager;
 
     public MultimediaMod(final IEventBus modBus, final ModContainer modContainer) {
         if (FMLLoader.getDist() == Dist.CLIENT) {
@@ -25,6 +29,10 @@ public class MultimediaMod {
                     FMLPaths.MODSDIR.get().resolve("lovetropics").resolve("media_cache"),
                     "LoveTropics Multimedia / " + modContainer.getModInfo().getVersion()
             );
+            slideshowManager = new SlideshowManager(mediaCache);
+
+            modBus.addListener(slideshowManager::registerOverlays);
+            NeoForge.EVENT_BUS.register(slideshowManager);
         }
     }
 
@@ -34,5 +42,9 @@ public class MultimediaMod {
 
     public static MediaFileCache mediaCache() {
         return Objects.requireNonNull(mediaCache, "Media cache not initialized");
+    }
+
+    public static SlideshowManager slideshowManager() {
+        return Objects.requireNonNull(slideshowManager, "Slideshow manager not initialized");
     }
 }
