@@ -26,6 +26,9 @@ public class PlaybackClock {
     }
 
     public void ensureInRange(final double frameStartTime, final double frameEndTime) {
+        if (isPaused()) {
+            return;
+        }
         final long currentTimestamp = getCurrentTimestamp();
         final double elapsedTime = (currentTimestamp - startedAt) / 1000.0;
         if (elapsedTime < frameStartTime || elapsedTime > frameEndTime) {
