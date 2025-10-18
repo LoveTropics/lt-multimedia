@@ -58,4 +58,8 @@ import org.slf4j.Logger;
         closed = true;
         thread.interrupt();
     }
+
+    public boolean isClosed() {
+        return closed;
+    }
 }

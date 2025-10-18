@@ -117,9 +117,14 @@ import java.util.function.Consumer;
         clock.ensureInRange(lastPlayedFrameEndTime, currentFrameEndTime);
 
         tryQueueFrames(lastPlayedFrameEndTime + QUEUE_AT_LEAST_SECONDS, false);
-        if (!queuedFrameEndTimes.isEmpty() && super.stopped()) {
-            // Somehow ran out of samples, but we're to resume again
-            play();
+
+        if (!playing() && !clock.isPaused()) {
+            if (!queuedFrameEndTimes.isEmpty()) {
+                // Somehow ran out of samples, but we're ready to resume again
+                play();
+            } else if (!packets.hasRemainingAudio()) {
+                scheduleClose();
+            }
         }
     }
 
@@ -208,6 +213,11 @@ import java.util.function.Consumer;
         @Override
         public void close() {
             execute(AudioPlaybackChannel::scheduleClose);
+        }
+
+        public boolean isStopped() {
+            final AudioPlaybackChannel channel = inner.getNow(null);
+            return channel != null && channel.stopped();
         }
     }
 }

@@ -107,6 +107,10 @@ public class Playback implements AutoCloseable {
         }
     }
 
+    public boolean hasStopped() {
+        return videoDecoder.isClosed() && (audioPlayback == null || audioPlayback.isStopped());
+    }
+
     @Nullable
     public VideoFrameTexture updateTexture(final GpuDevice device) {
         final PresentableVideoFrame nextFrame = videoFrameUploader.takeNextFrame();

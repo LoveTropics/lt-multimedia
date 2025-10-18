@@ -129,6 +129,10 @@ import java.util.concurrent.locks.ReentrantLock;
         }
     }
 
+    public boolean hasRemainingAudio() {
+        return !audioQueue.isEmpty();
+    }
+
     @Override
     public void close() {
         if (closed) {
@@ -169,6 +173,10 @@ import java.util.concurrent.locks.ReentrantLock;
 
         public boolean canAcceptPacket() {
             return discard || queue.size() < capacity;
+        }
+
+        public boolean isEmpty() {
+            return queue.isEmpty();
         }
 
         @Nullable
