@@ -9,37 +9,27 @@ pub struct JInputStream {
     object: GlobalRef,
     read_method: JMethodID,
     close_method: JMethodID,
-    buffer: Option<(GlobalRef, usize)>,
+    buffer: GlobalRef,
+    buffer_capacity: usize,
 }
 
 impl JInputStream {
-    pub fn new<'a>(env: &mut JNIEnv<'a>, object: JObject<'a>) -> Self {
+    pub fn new<'a>(env: &mut JNIEnv<'a>, object: JObject<'a>, buffer_capacity: usize) -> Self {
         let object = env.new_global_ref(object).unwrap();
 
         let class = env.find_class("java/io/InputStream").unwrap();
         let read_method = env.get_method_id(&class, "read", "([BII)I").unwrap();
         let close_method = env.get_method_id(&class, "close", "()V").unwrap();
 
+        let buffer = env.new_global_ref(env.new_byte_array(buffer_capacity as jsize).unwrap()).unwrap();
+
         JInputStream {
             vm: env.get_java_vm().unwrap(),
             object,
             read_method,
             close_method,
-            buffer: None,
-        }
-    }
-
-    fn ensure_buffer_capacity(
-        env: &mut JNIEnv,
-        buffer: Option<(GlobalRef, usize)>,
-        expected_capacity: usize,
-    ) -> (GlobalRef, usize) {
-        match buffer {
-            Some((buffer, capacity)) if capacity >= expected_capacity => (buffer, capacity),
-            _ => (
-                env.new_global_ref(env.new_byte_array(expected_capacity as jsize).unwrap()).unwrap(),
-                expected_capacity,
-            ),
+            buffer,
+            buffer_capacity,
         }
     }
 }
@@ -48,12 +38,7 @@ impl io::Read for JInputStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let mut env = self.vm.get_env().unwrap();
 
-        self.buffer = Some(Self::ensure_buffer_capacity(
-            &mut env,
-            self.buffer.take(),
-            buf.len(),
-        ));
-        let java_buf: &JByteArray = self.buffer.as_ref().unwrap().0.as_obj().into();
+        let java_buf: &JByteArray = self.buffer.as_obj().into();
 
         let result = unsafe {
             env.call_method_unchecked(
@@ -63,7 +48,7 @@ impl io::Read for JInputStream {
                 &[
                     jvalue { l: java_buf.as_raw(), },
                     jvalue { i: 0 },
-                    jvalue { i: buf.len() as jint, },
+                    jvalue { i: buf.len().min(self.buffer_capacity) as jint, },
                 ],
             )
             .map(|v| v.i().unwrap())

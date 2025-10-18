@@ -51,7 +51,7 @@ pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_o
     let file_name = unsafe { CStr::from_ptr(file_name.as_ptr()) };
     let file_name = file_name.to_string_lossy();
 
-    let input = JInputStream::new(&mut env, input);
+    let input = JInputStream::new(&mut env, input, 8196);
     handle_result(
         env,
         MultimediaReader::open(file_name, input).map(into_java_ptr),
