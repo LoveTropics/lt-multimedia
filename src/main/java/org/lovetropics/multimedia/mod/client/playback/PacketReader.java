@@ -16,8 +16,8 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 /* package-private */ class PacketReader implements AutoCloseable {
-    private static final int VIDEO_QUEUE_CAPACITY = 32;
-    private static final int AUDIO_QUEUE_CAPACITY = 32;
+    private static final int MAX_QUEUE_CAPACITY = 64;
+    private static final int PREFERRED_QUEUE_SIZE = 32;
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
@@ -27,8 +27,8 @@ import java.util.concurrent.locks.ReentrantLock;
     private final ReentrantLock lock = new ReentrantLock();
     private final Condition wakeUp = lock.newCondition();
 
-    private final PacketQueue<VideoPacket> videoQueue = new PacketQueue<>();
-    private final PacketQueue<AudioPacket> audioQueue = new PacketQueue<>();
+    private final PacketQueue<VideoPacket> videoQueue = new PacketQueue<>(MAX_QUEUE_CAPACITY, PREFERRED_QUEUE_SIZE);
+    private final PacketQueue<AudioPacket> audioQueue = new PacketQueue<>(MAX_QUEUE_CAPACITY, PREFERRED_QUEUE_SIZE);
 
     private volatile boolean sleeping;
     private volatile boolean closed;
@@ -118,11 +118,15 @@ import java.util.concurrent.locks.ReentrantLock;
     }
 
     private boolean shouldSleep() {
-        // To avoid stalling on either queue, ignore maximum capacity if the other queue is empty
+        if (!videoQueue.wantsPacket() && !audioQueue.wantsPacket()) {
+            return true;
+        }
+        // To avoid stalling on either queue, ignore maximum capacity if the other queue is totally empty
         if (videoQueue.needsPacket() || audioQueue.needsPacket()) {
             return false;
+        } else {
+            return !(videoQueue.canAcceptPacket() && audioQueue.canAcceptPacket());
         }
-        return videoQueue.size() >= VIDEO_QUEUE_CAPACITY || audioQueue.size() >= AUDIO_QUEUE_CAPACITY;
     }
 
     @Override
@@ -142,16 +146,29 @@ import java.util.concurrent.locks.ReentrantLock;
     }
 
     private class PacketQueue<P extends MultimediaPacket> {
-        private final Queue<P> queue = new ArrayDeque<>();
+        private final int capacity;
+        private final int preferredSize;
+
+        private final Queue<P> queue;
         private final Condition hasPacket = lock.newCondition();
         private volatile boolean discard;
+
+        private PacketQueue(final int capacity, final int preferredSize) {
+            this.capacity = capacity;
+            this.preferredSize = preferredSize;
+            queue = new ArrayDeque<>(capacity);
+        }
 
         public boolean needsPacket() {
             return !discard && queue.isEmpty();
         }
 
-        public int size() {
-            return queue.size();
+        public boolean wantsPacket() {
+            return !discard && queue.size() < preferredSize;
+        }
+
+        public boolean canAcceptPacket() {
+            return discard || queue.size() < capacity;
         }
 
         @Nullable
