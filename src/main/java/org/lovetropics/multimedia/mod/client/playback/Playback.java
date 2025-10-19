@@ -12,6 +12,8 @@ import javax.annotation.Nullable;
 import javax.sound.sampled.AudioFormat;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.file.Path;
 
 public class Playback implements AutoCloseable {
     /* package-private */ static final Thread.Builder IO_THREAD_BUILDER = Thread.ofPlatform()
@@ -56,8 +58,19 @@ public class Playback implements AutoCloseable {
         PlaybackManager.register(this);
     }
 
+    public static Playback open(final Path path, final FrameSize windowSize) throws IOException, DecoderException {
+        return open(MultimediaReader.open(path), windowSize);
+    }
+
     public static Playback open(final InputStream input, final FrameSize windowSize) throws IOException, DecoderException {
-        final MultimediaReader reader = MultimediaReader.open(input);
+        return open(MultimediaReader.open(input), windowSize);
+    }
+
+    public static Playback open(final SeekableByteChannel channel, final FrameSize windowSize) throws IOException, DecoderException {
+        return open(MultimediaReader.open(channel), windowSize);
+    }
+
+    private static Playback open(final MultimediaReader reader, final FrameSize windowSize) throws IOException, DecoderException {
         final VideoDecoder videoDecoder = reader.openVideoDecoder();
         if (videoDecoder == null) {
             throw new IOException("Media has no video stream");

@@ -10,11 +10,11 @@ import org.lovetropics.multimedia.mod.MediaFile;
 import org.slf4j.Logger;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -144,7 +144,7 @@ public class MediaFileCache {
         return getOrDownload(file.uri()).thenCompose(CachedFile::awaitDownload);
     }
 
-    public InputStream openInputStream(final MediaFile file) throws IOException {
+    public SeekableByteChannel openChannel(final MediaFile file) throws IOException {
         final CachedFile cached;
         try {
             cached = getOrDownload(file.uri()).join();
@@ -154,7 +154,7 @@ public class MediaFileCache {
                 case final Throwable cause -> throw new IOException(cause);
             }
         }
-        return cached.openInputStream();
+        return cached.openChannel();
     }
 
     private CompletableFuture<CachedFile> getOrDownload(final URI uri) {
@@ -220,7 +220,7 @@ public class MediaFileCache {
             request.header("If-None-Match", String.join(", ", ifNoneMatch));
         }
 
-        return httpClient.sendAsync(request.build(), HttpResponse.BodyHandlers.ofInputStream()).thenApplyAsync(response -> {
+        return httpClient.sendAsync(request.build(), FileDownload.bodyHandler()).thenApplyAsync(response -> {
             try {
                 return handleDownloadResponse(uri, response);
             } catch (final IOException e) {
@@ -229,7 +229,7 @@ public class MediaFileCache {
         }, consecutiveExecutor::schedule);
     }
 
-    private CachedFile handleDownloadResponse(final URI uri, final HttpResponse<InputStream> response) throws IOException {
+    private CachedFile handleDownloadResponse(final URI uri, final HttpResponse<FileDownload.Response> response) throws IOException {
         final Optional<String> etag = response.headers().firstValue("ETag");
 
         if (response.statusCode() == HttpStatus.SC_NOT_MODIFIED) {
@@ -246,16 +246,15 @@ public class MediaFileCache {
             throw new IOException("Unexpected status code " + response.statusCode());
         }
 
-        final long contentLength = response.headers().firstValueAsLong("Content-Length")
-                .orElseThrow(() -> new IOException("Response did not have Content-Length header"));
-
-        return startDownload(uri, etag, contentLength, response.body());
+        return startDownload(uri, etag, response.body());
     }
 
-    private CachedFile startDownload(final URI uri, final Optional<String> etag, final long contentLength, final InputStream body) {
-        final MediaFileId fileId = new MediaFileId(uri, etag, contentLength, Instant.now());
+    private CachedFile startDownload(final URI uri, final Optional<String> etag, final FileDownload.Response body) throws IOException {
+        final Path path = selectFilePath(uri);
+        final FileDownload download = body.startWritingTo(path);
 
-        final CachedFile file = CachedFile.startDownload(fileId, selectFilePath(uri), body);
+        final MediaFileId fileId = new MediaFileId(uri, etag, download.size(), Instant.now());
+        final CachedFile file = CachedFile.fromDownload(fileId, download);
         files.add(file);
 
         file.awaitDownload().thenRunAsync(this::storeIndex, consecutiveExecutor::schedule);

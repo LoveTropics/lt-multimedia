@@ -27,7 +27,7 @@ import org.slf4j.Logger;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
-import java.io.InputStream;
+import java.nio.channels.SeekableByteChannel;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
@@ -86,19 +86,19 @@ import java.util.function.Function;
     private static CompletableFuture<PreparedContent> prepareSlideContent(final MediaFileCache mediaCache, final Slide slide, final FrameSize windowSize) {
         return switch (slide) {
             case final Slide.Video video -> {
-                final InputStream input;
+                final SeekableByteChannel channel;
                 try {
-                    input = mediaCache.openInputStream(video.file());
+                    channel = mediaCache.openChannel(video.file());
                 } catch (final IOException e) {
                     LOGGER.error("Failed to load video slide", e);
                     yield CompletableFuture.completedFuture(new ErrorContent());
                 }
                 yield CompletableFuture.supplyAsync(() -> {
                     try {
-                        final Playback playback = Playback.open(input, windowSize);
+                        final Playback playback = Playback.open(channel, windowSize);
                         return new VideoContent(playback);
                     } catch (final IOException | DecoderException e) {
-                        IOUtils.closeQuietly(input);
+                        IOUtils.closeQuietly(channel);
                         LOGGER.error("Failed to load video slide", e);
                         return new ErrorContent();
                     }

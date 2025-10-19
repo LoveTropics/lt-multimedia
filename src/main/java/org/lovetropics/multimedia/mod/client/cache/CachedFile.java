@@ -2,7 +2,7 @@ package org.lovetropics.multimedia.mod.client.cache;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
-import java.io.InputStream;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -30,9 +30,8 @@ import java.util.concurrent.CompletionStage;
         this.lastAccessedAt = lastAccessedAt;
     }
 
-    public static CachedFile startDownload(final MediaFileId fileId, final Path path, final InputStream input) {
-        final FileDownload download = FileDownload.start(path, input, fileId.size());
-        return new CachedFile(fileId, path, download, Instant.now());
+    public static CachedFile fromDownload(final MediaFileId fileId, final FileDownload download) {
+        return new CachedFile(fileId, download.path(), download, Instant.now());
     }
 
     @Nullable
@@ -77,10 +76,10 @@ import java.util.concurrent.CompletionStage;
         return new MediaIndex.CachedFile(fileId, rootPath.relativize(path).toString(), lastAccessedAt);
     }
 
-    public InputStream openInputStream() throws IOException {
+    public SeekableByteChannel openChannel() throws IOException {
         if (download != null) {
-            return download.openInputStream();
+            return download.openChannel();
         }
-        return Files.newInputStream(path);
+        return Files.newByteChannel(path);
     }
 }
