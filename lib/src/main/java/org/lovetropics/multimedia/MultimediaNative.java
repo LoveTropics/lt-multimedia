@@ -3,6 +3,7 @@ package org.lovetropics.multimedia;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,7 +27,11 @@ public class MultimediaNative {
     public static final int AUDIO_FORMAT_F32 = 4;
     public static final int AUDIO_FORMAT_F64 = 5;
 
-    public static native long openReader(InputStream input) throws IOException;
+    public static native long openPathReader(String path) throws IOException;
+
+    public static native long openInputStreamReader(InputStream input) throws IOException;
+
+    public static native long openByteChannelReader(SeekableByteChannel channel) throws IOException;
 
     public static native void destroyReader(long reader) throws IOException;
 

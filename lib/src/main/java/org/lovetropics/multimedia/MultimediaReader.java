@@ -4,9 +4,12 @@ import org.jspecify.annotations.Nullable;
 
 import javax.sound.sampled.AudioFormat;
 import java.io.Closeable;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.file.Path;
 import java.util.Objects;
 
 public class MultimediaReader implements Closeable {
@@ -21,9 +24,24 @@ public class MultimediaReader implements Closeable {
         return Platform.tryDetect() != null;
     }
 
+    public static MultimediaReader open(final Path path) throws IOException {
+        Objects.requireNonNull(path);
+        final String pathString = path.toAbsolutePath().normalize().toString();
+        return new MultimediaReader(MultimediaNative.openPathReader(pathString));
+    }
+
     public static MultimediaReader open(final InputStream input) throws IOException {
         Objects.requireNonNull(input);
-        return new MultimediaReader(MultimediaNative.openReader(input));
+        // If we can upgrade to a seekable channel, prefer to use that
+        if (input instanceof final FileInputStream inputStream) {
+            return open(inputStream.getChannel());
+        }
+        return new MultimediaReader(MultimediaNative.openInputStreamReader(input));
+    }
+
+    public static MultimediaReader open(final SeekableByteChannel channel) throws IOException {
+        Objects.requireNonNull(channel);
+        return new MultimediaReader(MultimediaNative.openByteChannelReader(channel));
     }
 
     private void checkOpen() {

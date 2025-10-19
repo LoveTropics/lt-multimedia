@@ -1,11 +1,14 @@
+mod channel;
 mod input;
 
 use crate::*;
+use channel::JSeekableByteChannel;
 use ffmpeg_next::{format, ChannelLayout};
 use input::JInputStream;
-use jni::objects::{JByteBuffer, JClass, JObject};
+use jni::objects::{JByteBuffer, JClass, JObject, JString};
 use jni::sys::{jboolean, jdouble, jint, jlong};
 use jni::JNIEnv;
+use std::ffi::CStr;
 use std::{mem, slice};
 
 fn handle_result<R>(
@@ -40,15 +43,51 @@ fn handle_result<R>(
 
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]
-pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_openReader<'a>(
+pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_openPathReader<'a>(
+    mut env: JNIEnv<'a>,
+    _class: JClass<'a>,
+    path: JString<'a>,
+) -> jlong {
+    let path = env.get_string(&path).unwrap();
+    let path = unsafe { CStr::from_ptr(path.as_ptr()) };
+    let path = path.to_string_lossy();
+    handle_result(
+        env,
+        MultimediaReader::open_path(path.as_ref()).map(JMultimediaReader::Path).map(into_java_ptr),
+        0
+    )
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_openInputStreamReader<'a>(
     mut env: JNIEnv<'a>,
     _class: JClass<'a>,
     input: JObject<'a>,
 ) -> jlong {
-    let input = JInputStream::new(&mut env, input, 8196);
+    let input = JInputStream::new(&mut env, input, 4096);
     handle_result(
         env,
-        MultimediaReader::open_stream(input).map(into_java_ptr),
+        MultimediaReader::open_stream(input).map(JMultimediaReader::Stream).map(into_java_ptr),
+        0
+    )
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_openByteChannelReader<'a>(
+    mut env: JNIEnv<'a>,
+    _class: JClass<'a>,
+    channel: JObject<'a>,
+) -> jlong {
+    let input = match JSeekableByteChannel::new(&mut env, channel) {
+        Ok(input) => input,
+        Err(jni::errors::Error::JavaException) => return 0,
+        Err(err) => panic!("Failed to wrap SeekableByteChannel: {}", err),
+    };
+    handle_result(
+        env,
+        MultimediaReader::open_seekable(input).map(JMultimediaReader::ByteChannel).map(into_java_ptr),
         0
     )
 }
@@ -60,7 +99,7 @@ pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_d
     _class: JClass<'a>,
     reader: jlong,
 ) {
-    unsafe { destroy_java_ptr::<MultimediaReader<JInputStream>>(reader) }
+    unsafe { destroy_java_ptr::<JMultimediaReader>(reader) }
 }
 
 #[unsafe(no_mangle)]
@@ -70,7 +109,7 @@ pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_r
     _class: JClass<'a>,
     reader: jlong,
 ) -> jlong {
-    let reader: &mut MultimediaReader<JInputStream> = unsafe { from_java_ptr(&env, reader) };
+    let reader: &mut JMultimediaReader = unsafe { from_java_ptr(&env, reader) };
     match reader.read_packet() {
         Some(packet) => handle_result(env, packet.map(into_java_ptr), 0),
         None => 0
@@ -109,7 +148,7 @@ pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_o
     _class: JClass<'a>,
     reader: jlong,
 ) -> jlong {
-    let reader: &mut MultimediaReader<JInputStream> = unsafe { from_java_ptr(&env, reader) };
+    let reader: &mut JMultimediaReader = unsafe { from_java_ptr(&env, reader) };
     let decoder = reader.open_video_decoder().map(|decoder|
         decoder.map(|decoder| into_java_ptr(JFrameDecoder::from(decoder)))
             .unwrap_or(0)
@@ -246,7 +285,7 @@ pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_o
         _ => panic!("Unsupported audio format: {}", sample_format),
     };
 
-    let reader: &mut MultimediaReader<JInputStream> = unsafe { from_java_ptr(&env, reader) };
+    let reader: &mut JMultimediaReader = unsafe { from_java_ptr(&env, reader) };
     let format = AudioFrameFormat::new(
         sample_format,
         if stereo != 0 { ChannelLayout::STEREO } else { ChannelLayout::MONO },
@@ -383,6 +422,36 @@ unsafe fn as_slice_mut<'a>(env: &'a JNIEnv<'a>, buffer: &'a JByteBuffer) -> &'a 
             env.get_direct_buffer_address(&buffer).unwrap(),
             env.get_direct_buffer_capacity(&buffer).unwrap(),
         )
+    }
+}
+
+enum JMultimediaReader {
+    Path(MultimediaReader<()>),
+    ByteChannel(MultimediaReader<JSeekableByteChannel>),
+    Stream(MultimediaReader<JInputStream>),
+}
+
+macro_rules! forward_reader {
+    ($self:ident, $reader:ident => $e:expr) => {
+        match $self {
+            JMultimediaReader::Path($reader) => $e,
+            JMultimediaReader::ByteChannel($reader) => $e,
+            JMultimediaReader::Stream($reader) => $e,
+        }
+    };
+}
+
+impl JMultimediaReader {
+    fn read_packet(&mut self) -> Option<Result<MultimediaPacket>> {
+        forward_reader!(self, reader => reader.read_packet())
+    }
+
+    fn open_video_decoder(&mut self) -> Result<Option<VideoDecoder>> {
+        forward_reader!(self, reader => reader.open_video_decoder())
+    }
+
+    fn open_audio_decoder(&mut self, format: AudioFrameFormat) -> Result<Option<AudioDecoder>> {
+        forward_reader!(self, reader => reader.open_audio_decoder(format))
     }
 }
 
