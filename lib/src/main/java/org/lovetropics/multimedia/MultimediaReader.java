@@ -21,10 +21,9 @@ public class MultimediaReader implements Closeable {
         return Platform.tryDetect() != null;
     }
 
-    public static MultimediaReader open(final String fileName, final InputStream input) throws IOException {
-        Objects.requireNonNull(fileName);
+    public static MultimediaReader open(final InputStream input) throws IOException {
         Objects.requireNonNull(input);
-        return new MultimediaReader(MultimediaNative.openReader(fileName, input));
+        return new MultimediaReader(MultimediaNative.openReader(input));
     }
 
     private void checkOpen() {

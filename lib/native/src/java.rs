@@ -3,10 +3,9 @@ mod input;
 use crate::*;
 use ffmpeg_next::{format, ChannelLayout};
 use input::JInputStream;
-use jni::objects::{JByteBuffer, JClass, JObject, JString};
+use jni::objects::{JByteBuffer, JClass, JObject};
 use jni::sys::{jboolean, jdouble, jint, jlong};
 use jni::JNIEnv;
-use std::ffi::CStr;
 use std::{mem, slice};
 
 fn handle_result<R>(
@@ -44,17 +43,12 @@ fn handle_result<R>(
 pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_openReader<'a>(
     mut env: JNIEnv<'a>,
     _class: JClass<'a>,
-    file_name: JString<'a>,
     input: JObject<'a>,
 ) -> jlong {
-    let file_name = env.get_string(&file_name).unwrap();
-    let file_name = unsafe { CStr::from_ptr(file_name.as_ptr()) };
-    let file_name = file_name.to_string_lossy();
-
     let input = JInputStream::new(&mut env, input, 8196);
     handle_result(
         env,
-        MultimediaReader::open(file_name, input).map(into_java_ptr),
+        MultimediaReader::open_stream(input).map(into_java_ptr),
         0
     )
 }

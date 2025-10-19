@@ -8,6 +8,7 @@ use ffmpeg_next as ffmpeg;
 pub use audio::*;
 use crossbeam_utils::atomic::AtomicCell;
 use std::ffi::{c_int, c_uchar, c_void, CString, NulError};
+use std::path::Path;
 use std::pin::Pin;
 use std::sync::Once;
 use std::{io, ptr, slice};
@@ -36,17 +37,23 @@ pub enum MultimediaPacket {
     Audio(AudioPacket),
 }
 
-struct ReadState<R: io::Read> {
+struct ReadState<R> {
     read: R,
     last_error: AtomicCell<Option<io::Error>>,
 }
 
-impl<R: io::Read> ReadState<R> {
+impl<R> ReadState<R> {
+    fn store_error(&self, err: io::Error) {
+        self.last_error.store(Some(err))
+    }
+
+    fn take_error(&self) -> Option<io::Error> {
+        self.last_error.take()
+    }
+
     fn map_error(&self, err: ffmpeg::Error) -> Error {
         match err {
-            ffmpeg::Error::External => self
-                .last_error
-                .take()
+            ffmpeg::Error::External => self.take_error()
                 .map(Error::Io)
                 .unwrap_or(Error::Ffmpeg(ffmpeg::Error::External)),
             err => Error::Ffmpeg(err),
@@ -54,7 +61,7 @@ impl<R: io::Read> ReadState<R> {
     }
 }
 
-pub struct MultimediaReader<R: io::Read> {
+pub struct MultimediaReader<R> {
     input: format::context::Input,
     // Must be pinned, as it is implicitly referenced by the ffmpeg input context
     read_state: Pin<Box<ReadState<R>>>,
@@ -66,7 +73,40 @@ pub struct MultimediaReader<R: io::Read> {
 }
 
 impl<R: io::Read> MultimediaReader<R> {
-    pub fn open(file_name: impl AsRef<str>, read: R) -> Result<Self> {
+    pub fn open_stream(read: R) -> Result<Self> {
+        Self::open(read, |mut read_state| unsafe {
+            open_custom_io_input_context(
+                &mut read_state,
+                io_read::<R>,
+                None,
+            )
+        })
+    }
+}
+
+impl<R: io::Read + io::Seek> MultimediaReader<R> {
+    pub fn open_seekable(read: R) -> Result<Self> {
+        Self::open(read, |mut read_state| unsafe {
+            open_custom_io_input_context(
+                &mut read_state,
+                io_read::<R>,
+                Some(io_seek::<R>),
+            )
+        })
+    }
+}
+
+impl MultimediaReader<()> {
+    pub fn open_path(path: impl AsRef<Path>) -> Result<Self> {
+        Self::open((), |_| format::input(path.as_ref()))
+    }
+}
+
+impl<R> MultimediaReader<R> {
+    fn open<F>(read: R, context_factory: F) -> Result<Self>
+    where
+        F: FnOnce(&mut Pin<Box<ReadState<R>>>) -> Result<format::context::Input, ffmpeg::Error>,
+    {
         ensure_initialized();
 
         let mut read_state = Box::pin(ReadState {
@@ -74,9 +114,7 @@ impl<R: io::Read> MultimediaReader<R> {
             last_error: AtomicCell::new(None),
         });
 
-        let input =
-            unsafe { open_input_context(CString::new(file_name.as_ref())?, &mut read_state) }
-                .map_err(|err| read_state.map_error(err))?;
+        let input = context_factory(&mut read_state).map_err(|err| read_state.map_error(err))?;
         let video_stream_index = input.streams().best(media::Type::Video).map(|s| s.index());
         let audio_stream_index = input.streams().best(media::Type::Audio).map(|s| s.index());
 
@@ -101,7 +139,7 @@ impl<R: io::Read> MultimediaReader<R> {
                     }
                 }
                 None => {
-                    break if let Some(err) = self.read_state.last_error.take() {
+                    break if let Some(err) = self.read_state.take_error() {
                         Some(Err(err.into()))
                     } else if !self.video_eof {
                         self.video_eof = true;
@@ -138,9 +176,10 @@ impl<R: io::Read> MultimediaReader<R> {
     }
 }
 
-unsafe fn open_input_context<R: io::Read>(
-    file_name: CString,
+unsafe fn open_custom_io_input_context<R>(
     read: &mut Pin<Box<ReadState<R>>>,
+    io_read: unsafe extern "C" fn(*mut c_void, *mut u8, c_int) -> c_int,
+    io_seek: Option<unsafe extern "C" fn(*mut c_void, i64, c_int) -> i64>
 ) -> Result<format::context::Input, ffmpeg::Error> {
     const READ_BUFFER_SIZE: usize = 4096;
 
@@ -154,11 +193,12 @@ unsafe fn open_input_context<R: io::Read>(
             READ_BUFFER_SIZE as c_int,
             0,
             read.as_mut().get_unchecked_mut() as *mut ReadState<R> as *mut c_void,
-            Some(read_packet::<R>),
+            Some(io_read),
             None,
-            None,
+            io_seek,
         );
 
+        let file_name = CString::new("input").unwrap();
         match ffmpeg::ffi::avformat_open_input(
             &mut context,
             file_name.as_ptr(),
@@ -177,7 +217,7 @@ unsafe fn open_input_context<R: io::Read>(
     }
 }
 
-unsafe extern "C" fn read_packet<R: io::Read>(
+unsafe extern "C" fn io_read<R: io::Read>(
     opaque: *mut c_void,
     buf: *mut u8,
     buf_size: c_int,
@@ -188,10 +228,43 @@ unsafe extern "C" fn read_packet<R: io::Read>(
         Ok(0) => ffmpeg::Error::Eof.into(),
         Ok(bytes) => bytes as c_int,
         Err(err) => {
-            read_state.last_error.store(Some(err));
+            read_state.store_error(err);
             ffmpeg::Error::External.into()
         }
     }
+}
+
+unsafe extern "C" fn io_seek<R: io::Seek>(
+    opaque: *mut c_void,
+    offset: i64,
+    whence: c_int,
+) -> i64 {
+    let read_state = unsafe { &mut *(opaque as *mut ReadState<R>) };
+
+    let result = match whence {
+        ffmpeg::ffi::AVSEEK_SIZE => stream_size(&mut read_state.read),
+        ffmpeg::ffi::SEEK_CUR => read_state.read.seek(io::SeekFrom::Current(offset)),
+        ffmpeg::ffi::SEEK_SET => read_state.read.seek(io::SeekFrom::Start(offset as u64)),
+        ffmpeg::ffi::SEEK_END => read_state.read.seek(io::SeekFrom::End(offset)),
+        _ => panic!("Unknown whence: {}", whence),
+    };
+
+    match result {
+        Ok(result) => result as i64,
+        Err(err) => {
+            read_state.store_error(err);
+            <ffmpeg::Error as Into<c_int>>::into(ffmpeg::Error::External) as i64
+        }
+    }
+}
+
+fn stream_size<R: io::Seek>(read: &mut R) -> io::Result<u64> {
+    let old_position = read.stream_position()?;
+    let size = read.seek(io::SeekFrom::End(0))?;
+    if old_position != size {
+        read.seek(io::SeekFrom::Start(old_position))?;
+    }
+    Ok(size)
 }
 
 pub trait FrameDecoder {

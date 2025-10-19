@@ -26,7 +26,7 @@ public class MultimediaNative {
     public static final int AUDIO_FORMAT_F32 = 4;
     public static final int AUDIO_FORMAT_F64 = 5;
 
-    public static native long openReader(String fileName, InputStream input) throws IOException;
+    public static native long openReader(InputStream input) throws IOException;
 
     public static native void destroyReader(long reader) throws IOException;
 

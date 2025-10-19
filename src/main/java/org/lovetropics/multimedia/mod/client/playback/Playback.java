@@ -57,7 +57,7 @@ public class Playback implements AutoCloseable {
     }
 
     public static Playback open(final InputStream input, final FrameSize windowSize) throws IOException, DecoderException {
-        final MultimediaReader reader = MultimediaReader.open("playback", input);
+        final MultimediaReader reader = MultimediaReader.open(input);
         final VideoDecoder videoDecoder = reader.openVideoDecoder();
         if (videoDecoder == null) {
             throw new IOException("Media has no video stream");
