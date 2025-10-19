@@ -43,4 +43,10 @@ public class SlideshowManager {
         }
         activeSlideshow = new ActiveSlideshow(mediaCache, slideshow);
     }
+
+    public void clear() {
+        if (activeSlideshow != null) {
+            activeSlideshow.clear();
+        }
+    }
 }

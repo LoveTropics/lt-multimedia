@@ -16,11 +16,13 @@ public final class MultimediaModNetwork {
         final PayloadRegistrar registrar = event.registrar(PROTOCOL_VERSION);
         registrar.playToClient(ClientboundPreloadMediaPacket.TYPE, ClientboundPreloadMediaPacket.STREAM_CODEC);
         registrar.playToClient(ClientboundStartSlideshowPacket.TYPE, ClientboundStartSlideshowPacket.STREAM_CODEC);
+        registrar.playToClient(ClientboundClearSlideshowPacket.TYPE, ClientboundClearSlideshowPacket.STREAM_CODEC);
     }
 
     @SubscribeEvent
     public static void registerClientHandler(final RegisterClientPayloadHandlersEvent event) {
         event.register(ClientboundPreloadMediaPacket.TYPE, ClientboundPreloadMediaPacket::handle);
         event.register(ClientboundStartSlideshowPacket.TYPE, ClientboundStartSlideshowPacket::handle);
+        event.register(ClientboundClearSlideshowPacket.TYPE, ClientboundClearSlideshowPacket::handle);
     }
 }
