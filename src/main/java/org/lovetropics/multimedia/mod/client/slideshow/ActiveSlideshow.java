@@ -121,7 +121,12 @@ import java.util.function.Function;
         }
 
         if (currentSlide == null && nextSlide == null) {
+            closeScreen();
             return true;
+        }
+
+        if (currentSlide != null) {
+            openScreen();
         }
 
         if ((currentSlide == null || currentSlide.isReadyToSwapOut()) && (nextSlide == null || nextSlide.isReadyToSwapIn())) {
@@ -134,6 +139,20 @@ import java.util.function.Function;
         }
 
         return false;
+    }
+
+    private void openScreen() {
+        final Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen == null) {
+            minecraft.setScreen(new SlideshowScreen());
+        }
+    }
+
+    private void closeScreen() {
+        final Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen instanceof SlideshowScreen) {
+            minecraft.setScreen(null);
+        }
     }
 
     private void swapSlides() {
@@ -244,9 +263,6 @@ import java.util.function.Function;
         @Override
         public void draw(final GuiGraphics graphics, final Font font, final float alpha) {
             playback.updateWindowSize(FrameSize.from(Minecraft.getInstance().getWindow()));
-
-            // Could definitely be more efficient than just filling the entire screen... :)
-            graphics.fill(0, 0, graphics.guiWidth(), graphics.guiHeight(), ARGB.color(alpha, CommonColors.BLACK));
 
             final VideoFrameTexture texture = playback.updateTexture(RenderSystem.getDevice());
             if (texture == null) {
