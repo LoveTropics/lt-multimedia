@@ -2,6 +2,7 @@ package org.lovetropics.multimedia.mod.client.slideshow;
 
 import net.minecraft.client.Minecraft;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import org.lovetropics.multimedia.mod.MultimediaMod;
@@ -33,6 +34,14 @@ public class SlideshowManager {
     @SubscribeEvent
     public void tick(final ClientTickEvent.Pre event) {
         if (activeSlideshow != null && activeSlideshow.tick()) {
+            activeSlideshow = null;
+        }
+    }
+
+    @SubscribeEvent
+    public void onLoggedOut(final ClientPlayerNetworkEvent.LoggingOut event) {
+        if (activeSlideshow != null) {
+            activeSlideshow.close();
             activeSlideshow = null;
         }
     }

@@ -35,7 +35,7 @@ import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
-/* package-private */ class ActiveSlideshow {
+/* package-private */ class ActiveSlideshow implements AutoCloseable {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private final MediaFileCache mediaCache;
@@ -192,6 +192,18 @@ import java.util.function.Function;
         }
         if (nextSlide != null && fade > 0.0f) {
             nextSlide.draw(graphics, font, fade);
+        }
+    }
+
+    @Override
+    public void close() {
+        if (currentSlide != null) {
+            currentSlide.close();
+            currentSlide = null;
+        }
+        if (nextSlide != null) {
+            nextSlide.close();
+            nextSlide = null;
         }
     }
 
