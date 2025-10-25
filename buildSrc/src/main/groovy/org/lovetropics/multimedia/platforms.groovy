@@ -1,6 +1,5 @@
 package org.lovetropics.multimedia
 
-import org.gradle.api.Project
 import org.gradle.api.file.Directory
 
 enum NativeBuildPlatform {
@@ -61,7 +60,7 @@ enum Arch {
 
     static Arch detect(String archName) {
         archName = archName.toLowerCase(Locale.ROOT)
-        if (archName.contains("arm64")) {
+        if (archName.contains("arm64") || archName.contains("aarch64")) {
             return ARM64
         } else if (archName.contains("64")) {
             return X64

@@ -84,7 +84,7 @@ import java.util.Locale;
 
         public static @Nullable Arch detect() {
             final String archName = OS_ARCH.toLowerCase(Locale.ROOT);
-            if (archName.contains("arm64")) {
+            if (archName.contains("arm64") || archName.equals("aarch64")) {
                 return ARM64;
             } else if (archName.contains("64")) {
                 return X64;
