@@ -5,7 +5,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.options.OptionsSubScreen;
 import net.minecraft.client.gui.screens.options.SoundOptionsScreen;
 import net.minecraft.network.chat.Component;
-import org.lovetropics.multimedia.mod.config.MultimediaConfig;
+import org.lovetropics.multimedia.mod.config.MultimediaClientConfig;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -19,6 +19,6 @@ public abstract class SoundOptionsScreenMixin extends OptionsSubScreen {
 
     @Inject(method = "addOptions", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/components/OptionsList;addBig(Lnet/minecraft/client/OptionInstance;)V", ordinal = 1))
     private void addOptions(final CallbackInfo ci) {
-        list.addSmall(MultimediaConfig.client().audioVolumeOption());
+        list.addSmall(MultimediaClientConfig.get().audioVolumeOption());
     }
 }

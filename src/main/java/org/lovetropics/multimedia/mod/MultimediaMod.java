@@ -18,7 +18,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 import org.lovetropics.multimedia.mod.client.cache.MediaFileCache;
 import org.lovetropics.multimedia.mod.client.entity.render.ScreenRenderer;
 import org.lovetropics.multimedia.mod.client.slideshow.SlideshowManager;
-import org.lovetropics.multimedia.mod.config.MultimediaConfig;
+import org.lovetropics.multimedia.mod.config.MultimediaClientConfig;
 import org.lovetropics.multimedia.mod.entity.ScreenEntity;
 import org.lovetropics.multimedia.mod.network.MultimediaModNetwork;
 
@@ -44,12 +44,12 @@ public class MultimediaMod {
     private static SlideshowManager slideshowManager;
 
     public MultimediaMod(final IEventBus modBus, final ModContainer modContainer) {
-        MultimediaConfig.register(modContainer);
-
         ENTITY_REGISTER.register(modBus);
         MultimediaModNetwork.DATA_SERIALIZER_REGISTER.register(modBus);
 
         if (FMLLoader.getDist() == Dist.CLIENT) {
+            MultimediaClientConfig.register(modContainer);
+
             mediaCache = new MediaFileCache(
                     FMLPaths.MODSDIR.get().resolve("lovetropics").resolve("media_cache"),
                     "LoveTropics Multimedia / " + modContainer.getModInfo().getVersion()
