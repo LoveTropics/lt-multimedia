@@ -7,17 +7,15 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import org.lovetropics.multimedia.mod.MultimediaMod;
 import org.lovetropics.multimedia.mod.client.cache.MediaFileCache;
-import org.lovetropics.multimedia.mod.slideshow.Slide;
 import org.lovetropics.multimedia.mod.slideshow.Slideshow;
 
 import javax.annotation.Nullable;
 
-// TODO: Capture and lock input
 public class SlideshowManager {
     private final MediaFileCache mediaCache;
 
     @Nullable
-    private ActiveSlideshow activeSlideshow;
+    private FullScreenSlideshow fullScreenSlideshow;
 
     public SlideshowManager(final MediaFileCache mediaCache) {
         this.mediaCache = mediaCache;
@@ -25,37 +23,36 @@ public class SlideshowManager {
 
     public void registerOverlays(final RegisterGuiLayersEvent event) {
         event.registerAboveAll(MultimediaMod.location("slideshow"), (graphics, deltaTracker) -> {
-            if (activeSlideshow != null) {
-                activeSlideshow.draw(graphics, Minecraft.getInstance().font, deltaTracker);
+            if (fullScreenSlideshow != null) {
+                final float partialTicks = deltaTracker.getGameTimeDeltaPartialTick(true);
+                fullScreenSlideshow.draw(SlideshowGraphics.forGui(graphics, Minecraft.getInstance().font), partialTicks);
             }
         });
     }
 
     @SubscribeEvent
     public void tick(final ClientTickEvent.Pre event) {
-        if (activeSlideshow != null && activeSlideshow.tick()) {
-            activeSlideshow = null;
+        if (fullScreenSlideshow != null && fullScreenSlideshow.tick()) {
+            fullScreenSlideshow = null;
         }
     }
 
     @SubscribeEvent
     public void onLoggedOut(final ClientPlayerNetworkEvent.LoggingOut event) {
-        if (activeSlideshow != null) {
-            activeSlideshow.close();
-            activeSlideshow = null;
+        if (fullScreenSlideshow != null) {
+            fullScreenSlideshow.close();
+            fullScreenSlideshow = null;
         }
     }
 
     public void start(final Slideshow slideshow) {
-        for (final Slide slide : slideshow.slides()) {
-            mediaCache.ensureDownloaded(slide.file());
-        }
-        activeSlideshow = new ActiveSlideshow(mediaCache, slideshow);
+        slideshow.ensureDownloaded(mediaCache);
+        fullScreenSlideshow = new FullScreenSlideshow(new SlideshowDriver(mediaCache, slideshow));
     }
 
     public void clear() {
-        if (activeSlideshow != null) {
-            activeSlideshow.clear();
+        if (fullScreenSlideshow != null) {
+            fullScreenSlideshow.clear();
         }
     }
 }

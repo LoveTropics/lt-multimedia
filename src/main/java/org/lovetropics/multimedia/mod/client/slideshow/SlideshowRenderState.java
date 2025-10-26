@@ -1,0 +1,20 @@
+package org.lovetropics.multimedia.mod.client.slideshow;
+
+import org.jetbrains.annotations.Nullable;
+
+public record SlideshowRenderState(
+        @Nullable
+        PreparedSlideContent currentSlide,
+        @Nullable
+        PreparedSlideContent nextSlide,
+        float fade
+) {
+    public void draw(final SlideshowGraphics graphics) {
+        if (currentSlide != null && fade < 1.0f) {
+            currentSlide.draw(graphics, 1.0f - fade);
+        }
+        if (nextSlide != null && fade > 0.0f) {
+            nextSlide.draw(graphics, fade);
+        }
+    }
+}
