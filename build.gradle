@@ -2,7 +2,6 @@ import org.lovetropics.multimedia.NativeBuildPlatform
 
 plugins {
     id 'idea'
-    id 'maven-publish'
     id 'java-library'
     id 'io.github.goooler.shadow' version '8.1.8'
     id 'net.neoforged.moddev' version '2.0.107'
@@ -67,31 +66,15 @@ configurations {
     additionalRuntimeClasspath.extendsFrom shadeNative
 }
 
-repositories {
-    maven {
-        url = 'https://maven.gegy.dev/releases'
-        content {
-            includeGroup 'org.lovetropics'
-        }
-    }
-}
-
 dependencies {
-    if (env.BUILD_LIB || env.CROSS_PLATFORM_BUILD) {
-        shade project(':lib')
-        if (env.CROSS_PLATFORM_BUILD) {
-            NativeBuildPlatform.values().each { final platform ->
-                final def nativeFile = platform.getArtifactFile(layout.projectDirectory, 'multimedia-lib', project.ext.libVersion)
-                shadeNative files(nativeFile.path)
-            }
-        } else {
-            shadeNative project(':lib:native')
+    shade project(':lib')
+    if (env.CROSS_PLATFORM_BUILD) {
+        NativeBuildPlatform.values().each { final platform ->
+            final def nativeFile = platform.getArtifactFile(layout.projectDirectory, 'multimedia-lib', project.ext.libVersion)
+            shadeNative files(nativeFile.path)
         }
     } else {
-        shade "org.lovetropics:multimedia-lib:$prebuilt_lib_version"
-        NativeBuildPlatform.values().each { final platform ->
-            shadeNative "org.lovetropics:multimedia-lib:$prebuilt_lib_version:native-${platform.classifier}"
-        }
+        shadeNative project(':lib:native')
     }
 }
 

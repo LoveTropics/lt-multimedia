@@ -43,6 +43,7 @@ runs:
       env:
         BUILD_ARCH: ${{ inputs.arch }}
         BUILD_TARGET: ${{ inputs.target }}
+        BUILD_STATIC: true
       run: ./gradlew :lib:native:build
       shell: msys2 {0}
 

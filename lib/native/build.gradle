@@ -27,6 +27,9 @@ tasks.register('buildNatives', Exec) {
     if (buildTarget) {
         command += ['--target', buildTarget]
     }
+    if (env.BUILD_STATIC) {
+        command += ['--features', 'static']
+    }
 
     commandLine command
 }
