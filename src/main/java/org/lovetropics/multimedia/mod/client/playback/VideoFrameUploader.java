@@ -38,6 +38,23 @@ public class VideoFrameUploader implements AutoCloseable {
         for (final FrameBuffer buffer : frameBuffers) {
             buffer.tick(device, requestedFrameSize);
         }
+        discardExpiredFrames();
+    }
+
+    // If we stop rendering (for example the playback goes off-screen), we don't want to stall it due to frames not being consumed
+    private void discardExpiredFrames() {
+        for (int i = 0; i < frameBuffers.length - 1; i++) {
+            final int index = (nextReadIndex + i) % frameBuffers.length;
+            final int nextIndex = (index + 1) % frameBuffers.length;
+            final FrameBuffer nextFrameBuffer = frameBuffers[nextIndex];
+            if (nextFrameBuffer.isReadyToPresent() && clock.getElapsedTime() >= nextFrameBuffer.presentTime) {
+                // The next frame is already ready, we will never need to present this one
+                frameBuffers[index].recycle(device, requestedFrameSize);
+                nextReadIndex = nextIndex;
+            } else {
+                break;
+            }
+        }
     }
 
     public void writeFrame(final VideoFrame frame) throws DecoderException, InterruptedException {
