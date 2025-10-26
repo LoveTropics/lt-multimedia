@@ -21,6 +21,9 @@ public interface PreparedSlideContent extends AutoCloseable {
 
     void close();
 
+    default void setAudioVolume(final float volume) {
+    }
+
     default void setAudioSource(final AudioWorldSource source) {
     }
 
@@ -53,6 +56,11 @@ public interface PreparedSlideContent extends AutoCloseable {
         @Override
         public void close() {
             playback.close();
+        }
+
+        @Override
+        public void setAudioVolume(final float volume) {
+            playback.setAudioVolume(volume);
         }
 
         @Override

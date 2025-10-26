@@ -1,4 +1,5 @@
 {
   "commands.slideshow.error.no_slideshow": "No slideshow with id '%s'",
-  "slideshow.slide.error": "This slide could not be displayed"
+  "slideshow.slide.error": "This slide could not be displayed",
+  "soundCategory.multimedia.video": "Video Playback"
 }

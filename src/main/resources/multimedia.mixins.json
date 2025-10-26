@@ -5,7 +5,8 @@
   "mixins": [
   ],
   "client": [
-    "client.GameRendererMixin"
+    "client.GameRendererMixin",
+    "client.SoundOptionsScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1

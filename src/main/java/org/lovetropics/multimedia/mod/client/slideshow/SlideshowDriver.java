@@ -31,6 +31,7 @@ public class SlideshowDriver implements AutoCloseable {
     private final MediaFileCache mediaCache;
     private final Slideshow slideshow;
 
+    private float audioVolume = 1.0f;
     @Nullable
     private AudioWorldSource audioSource;
 
@@ -47,6 +48,16 @@ public class SlideshowDriver implements AutoCloseable {
         this.mediaCache = mediaCache;
         this.slideshow = slideshow;
         slideQueue.addAll(slideshow.slides());
+    }
+
+    public void setAudioVolume(final float volume) {
+        if (volume == audioVolume) {
+            return;
+        }
+        audioVolume = volume;
+        if (currentSlide != null) {
+            currentSlide.setAudioVolume(volume);
+        }
     }
 
     public void setAudioSource(final AudioWorldSource source) {
@@ -146,13 +157,18 @@ public class SlideshowDriver implements AutoCloseable {
             currentSlide.close();
         }
         if (nextSlide != null) {
-            if (audioSource != null) {
-                nextSlide.setAudioSource(audioSource);
-            }
+            setupSlideAudio(nextSlide);
             nextSlide.start();
         }
         currentSlide = nextSlide;
         nextSlide = prepareNextSlide(slideshow, currentSlide);
+    }
+
+    private void setupSlideAudio(final PreparedSlide slide) {
+        slide.setAudioVolume(audioVolume);
+        if (audioSource != null) {
+            slide.setAudioSource(audioSource);
+        }
     }
 
     @Nullable
@@ -213,11 +229,12 @@ public class SlideshowDriver implements AutoCloseable {
             return content != null && content.isReadyToSwapOut();
         }
 
+        public void setAudioVolume(final float volume) {
+            content.join().setAudioVolume(volume);
+        }
+
         public void setAudioSource(final AudioWorldSource source) {
-            final PreparedSlideContent content = getContentNow();
-            if (content != null) {
-                content.setAudioSource(source);
-            }
+            content.join().setAudioSource(source);
         }
 
         public void start() {
