@@ -130,7 +130,7 @@ import java.util.concurrent.locks.ReentrantLock;
     }
 
     public boolean hasRemainingAudio() {
-        return !audioQueue.isEmpty();
+        return !closed || !audioQueue.isEmpty();
     }
 
     @Override
