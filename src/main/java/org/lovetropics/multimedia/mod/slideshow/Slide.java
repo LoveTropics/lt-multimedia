@@ -29,12 +29,14 @@ public sealed interface Slide {
     record Video(
             MediaFile file,
             Optional<SlideTransition> transitionIn,
-            Optional<SlideTransition> transitionOut
+            Optional<SlideTransition> transitionOut,
+            float volume
     ) implements Slide {
         public static final MapCodec<Video> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 MediaFile.CODEC.fieldOf("file").forGetter(Video::file),
                 SlideTransition.CODEC.optionalFieldOf("transition_in").forGetter(Video::transitionIn),
-                SlideTransition.CODEC.optionalFieldOf("transition_out").forGetter(Video::transitionOut)
+                SlideTransition.CODEC.optionalFieldOf("transition_out").forGetter(Video::transitionOut),
+                Codec.FLOAT.optionalFieldOf("volume", 1.0f).forGetter(Video::volume)
         ).apply(i, Video::new));
 
         @Override

@@ -27,7 +27,7 @@ public interface PreparedSlideContent extends AutoCloseable {
     default void setAudioSource(final AudioWorldSource source) {
     }
 
-    record Video(Playback playback) implements PreparedSlideContent {
+    record Video(Playback playback, float volume) implements PreparedSlideContent {
         @Override
         public boolean isReadyToSwapOut() {
             return playback.hasStopped();
@@ -60,7 +60,7 @@ public interface PreparedSlideContent extends AutoCloseable {
 
         @Override
         public void setAudioVolume(final float volume) {
-            playback.setAudioVolume(volume);
+            playback.setAudioVolume(volume * this.volume);
         }
 
         @Override
