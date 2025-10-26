@@ -23,7 +23,7 @@ public class Playback implements AutoCloseable {
             .name("video-decoder-", 0)
             .daemon(true);
 
-    private static final AudioFormat AUDIO_FORMAT = new AudioFormat(44100, 16, 2, true, false);
+    private static final AudioFormat MONO_AUDIO_FORMAT = new AudioFormat(44100, 16, 1, true, false);
 
     private final FrameSize sourceFrameSize;
 
@@ -75,7 +75,7 @@ public class Playback implements AutoCloseable {
         if (videoDecoder == null) {
             throw new IOException("Media has no video stream");
         }
-        final AudioDecoder audioDecoder = reader.openAudioDecoder(AUDIO_FORMAT);
+        final AudioDecoder audioDecoder = reader.openAudioDecoder(MONO_AUDIO_FORMAT);
         return new Playback(reader, videoDecoder, audioDecoder, windowSize);
     }
 
@@ -90,6 +90,22 @@ public class Playback implements AutoCloseable {
 
     public void updateWindowSize(final FrameSize windowSize) {
         videoFrameUploader.requestFrameSize(fitTextureSize(windowSize));
+    }
+
+    public void setAudioVolume(final float volume) {
+        if (audioPlayback != null) {
+            audioPlayback.execute(channel ->
+                    channel.setVolume(volume)
+            );
+        }
+    }
+
+    public void setAudioSource(final AudioWorldSource source) {
+        if (audioPlayback != null) {
+            audioPlayback.execute(channel ->
+                    channel.setWorldSource(source)
+            );
+        }
     }
 
     public void play() {

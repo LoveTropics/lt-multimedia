@@ -7,6 +7,7 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.client.sounds.ChannelAccess;
 import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.Nullable;
 import org.lovetropics.multimedia.AudioDecoder;
 import org.lovetropics.multimedia.AudioFrame;
 import org.lovetropics.multimedia.AudioPacket;
@@ -29,6 +30,7 @@ import java.util.function.Consumer;
     // Ensure we have enough audio to fill the space between ticks, even at a low tick/frame rate
     private static final double QUEUE_AT_LEAST_SECONDS = 0.25;
 
+    private final SoundManager soundManager;
     private final PacketReader packets;
     private final AudioDecoder decoder;
     private final PlaybackClock clock;
@@ -36,10 +38,14 @@ import java.util.function.Consumer;
     private final Deque<Double> queuedFrameEndTimes = new ArrayDeque<>();
     private double lastPlayedFrameEndTime;
 
+    @Nullable
+    private AudioWorldSource worldSource;
+
     private volatile boolean closed;
 
-    private AudioPlaybackChannel(final int source, final PacketReader packets, final AudioDecoder decoder, final PlaybackClock clock) {
+    private AudioPlaybackChannel(final int source, final SoundManager soundManager, final PacketReader packets, final AudioDecoder decoder, final PlaybackClock clock) {
         super(source);
+        this.soundManager = soundManager;
         this.packets = packets;
         this.decoder = decoder;
         this.clock = clock;
@@ -60,7 +66,7 @@ import java.util.function.Consumer;
             if (OpenAlUtil.checkALError("Playback audio source")) {
                 return null;
             }
-            final AudioPlaybackChannel channel = new AudioPlaybackChannel(sources[0], packets, decoder, clock);
+            final AudioPlaybackChannel channel = new AudioPlaybackChannel(sources[0], soundManager, packets, decoder, clock);
             channel.tryQueueFrames(QUEUE_AT_LEAST_SECONDS, true);
             channelAccess.channels.add(createChannelHandle(channelAccess, channel));
             return channel;
@@ -94,6 +100,14 @@ import java.util.function.Consumer;
         };
     }
 
+    public void setWorldSource(final AudioWorldSource worldSource) {
+        this.worldSource = worldSource;
+        final Vec3 listenerPos = soundManager.getListenerTransform().position();
+        linearAttenuation(worldSource.attenuationDistance());
+        setSelfPosition(worldSource.resolveSourcePos(listenerPos));
+        setRelative(false);
+    }
+
     // ChannelAccess will delete this channel if it ever reports being stopped - we might pause for a bit if we're
     // lagging behind, but we don't want to actually stop until the playback is over.
     @Override
@@ -105,6 +119,11 @@ import java.util.function.Consumer;
     public void updateStream() {
         if (closed) {
             return;
+        }
+
+        if (worldSource != null) {
+            final Vec3 listenerPos = soundManager.getListenerTransform().position();
+            setSelfPosition(worldSource.resolveSourcePos(listenerPos));
         }
 
         final int processedBuffers = removeProcessedBuffers();

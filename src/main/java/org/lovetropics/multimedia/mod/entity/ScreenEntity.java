@@ -16,6 +16,8 @@ import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Quaternionf;
+import org.lovetropics.multimedia.mod.client.playback.AudioWorldSource;
 import org.lovetropics.multimedia.mod.network.MultimediaModNetwork;
 import org.lovetropics.multimedia.mod.slideshow.Slideshow;
 import org.lovetropics.multimedia.mod.slideshow.SlideshowHolder;
@@ -26,9 +28,11 @@ import java.util.Optional;
 public class ScreenEntity extends Entity {
     public static final float DEFAULT_WIDTH = 4.0f;
     public static final float DEFAULT_HEIGHT = 2.25f;
+    public static final float DEFAULT_AUDIO_RADIUS = 64.0f;
 
     private static final EntityDataAccessor<Float> DATA_WIDTH = SynchedEntityData.defineId(ScreenEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> DATA_HEIGHT = SynchedEntityData.defineId(ScreenEntity.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> DATA_AUDIO_RADIUS = SynchedEntityData.defineId(ScreenEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Optional<Slideshow>> DATA_CLIENT_SLIDESHOW = SynchedEntityData.defineId(ScreenEntity.class, MultimediaModNetwork.SLIDESHOW_SERIALIZER.get());
 
     @Nullable
@@ -46,6 +50,7 @@ public class ScreenEntity extends Entity {
         builder.define(DATA_CLIENT_SLIDESHOW, Optional.empty());
         builder.define(DATA_WIDTH, DEFAULT_WIDTH);
         builder.define(DATA_HEIGHT, DEFAULT_HEIGHT);
+        builder.define(DATA_AUDIO_RADIUS, DEFAULT_AUDIO_RADIUS);
     }
 
     private void setSlideshow(@Nullable final SlideshowHolder slideshow) {
@@ -63,6 +68,10 @@ public class ScreenEntity extends Entity {
 
     public float getHeight() {
         return entityData.get(DATA_HEIGHT);
+    }
+
+    private float getAudioRadius() {
+        return entityData.get(DATA_AUDIO_RADIUS);
     }
 
     @Override
@@ -103,10 +112,25 @@ public class ScreenEntity extends Entity {
         return box.build().move(center);
     }
 
+    public AudioWorldSource asAudioSource() {
+        return new AudioWorldSource.Rectangle(
+                position(),
+                new Quaternionf().rotationXYZ(
+                        getXRot() * Mth.DEG_TO_RAD,
+                        -getYRot() * Mth.DEG_TO_RAD,
+                        0.0f
+                ),
+                getWidth(),
+                getHeight(),
+                getAudioRadius()
+        );
+    }
+
     @Override
     protected void addAdditionalSaveData(final ValueOutput output) {
-        output.putFloat("width", entityData.get(DATA_WIDTH));
-        output.putFloat("height", entityData.get(DATA_HEIGHT));
+        output.putFloat("width", getWidth());
+        output.putFloat("height", getHeight());
+        output.putFloat("audio_radius", getAudioRadius());
         if (slideshow != null) {
             output.store("slideshow", ResourceLocation.CODEC, slideshow.id());
         }
@@ -116,6 +140,7 @@ public class ScreenEntity extends Entity {
     protected void readAdditionalSaveData(final ValueInput input) {
         entityData.set(DATA_WIDTH, input.getFloatOr("width", DEFAULT_WIDTH));
         entityData.set(DATA_HEIGHT, input.getFloatOr("height", DEFAULT_HEIGHT));
+        entityData.set(DATA_AUDIO_RADIUS, input.getFloatOr("audio_radius", DEFAULT_AUDIO_RADIUS));
         setSlideshow(input.read("slideshow", ResourceLocation.CODEC)
                 .map(Slideshows.REGISTRY::get)
                 .orElse(null));

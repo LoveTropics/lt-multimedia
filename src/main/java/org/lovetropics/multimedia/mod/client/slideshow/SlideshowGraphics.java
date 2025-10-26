@@ -11,6 +11,7 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector2fc;
 import org.joml.Vector3f;
@@ -21,7 +22,7 @@ public interface SlideshowGraphics {
     double LOG_2 = Math.log(2.0);
 
     static float roundLog2(final float value) {
-        return (float) Math.pow(2.0, Math.round(Math.log(value) / LOG_2));
+        return (float) Math.pow(2.0, Mth.ceil(Math.log(value) / LOG_2));
     }
 
     static SlideshowGraphics forGui(final GuiGraphics graphics, final Font font) {

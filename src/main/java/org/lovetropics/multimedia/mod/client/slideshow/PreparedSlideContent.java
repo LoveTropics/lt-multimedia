@@ -4,6 +4,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.CommonColors;
+import org.lovetropics.multimedia.mod.client.playback.AudioWorldSource;
 import org.lovetropics.multimedia.mod.client.playback.FrameSize;
 import org.lovetropics.multimedia.mod.client.playback.Playback;
 import org.lovetropics.multimedia.mod.client.playback.VideoFrameTexture;
@@ -19,6 +20,9 @@ public interface PreparedSlideContent extends AutoCloseable {
     void draw(SlideshowGraphics graphics, float alpha);
 
     void close();
+
+    default void setAudioSource(final AudioWorldSource source) {
+    }
 
     record Video(Playback playback) implements PreparedSlideContent {
         @Override
@@ -49,6 +53,11 @@ public interface PreparedSlideContent extends AutoCloseable {
         @Override
         public void close() {
             playback.close();
+        }
+
+        @Override
+        public void setAudioSource(final AudioWorldSource source) {
+            playback.setAudioSource(source);
         }
     }
 

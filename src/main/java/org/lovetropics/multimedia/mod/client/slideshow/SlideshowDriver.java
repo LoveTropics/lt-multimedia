@@ -9,6 +9,7 @@ import net.minecraft.util.Mth;
 import org.apache.commons.io.IOUtils;
 import org.lovetropics.multimedia.DecoderException;
 import org.lovetropics.multimedia.mod.client.cache.MediaFileCache;
+import org.lovetropics.multimedia.mod.client.playback.AudioWorldSource;
 import org.lovetropics.multimedia.mod.client.playback.FrameSize;
 import org.lovetropics.multimedia.mod.client.playback.Playback;
 import org.lovetropics.multimedia.mod.slideshow.Slide;
@@ -31,6 +32,9 @@ public class SlideshowDriver implements AutoCloseable {
     private final Slideshow slideshow;
 
     @Nullable
+    private AudioWorldSource audioSource;
+
+    @Nullable
     private PreparedSlide currentSlide;
     @Nullable
     private PreparedSlide nextSlide;
@@ -43,6 +47,16 @@ public class SlideshowDriver implements AutoCloseable {
         this.mediaCache = mediaCache;
         this.slideshow = slideshow;
         slideQueue.addAll(slideshow.slides());
+    }
+
+    public void setAudioSource(final AudioWorldSource source) {
+        if (source.equals(audioSource)) {
+            return;
+        }
+        audioSource = source;
+        if (currentSlide != null) {
+            currentSlide.setAudioSource(audioSource);
+        }
     }
 
     @Nullable
@@ -132,6 +146,9 @@ public class SlideshowDriver implements AutoCloseable {
             currentSlide.close();
         }
         if (nextSlide != null) {
+            if (audioSource != null) {
+                nextSlide.setAudioSource(audioSource);
+            }
             nextSlide.start();
         }
         currentSlide = nextSlide;
@@ -194,6 +211,13 @@ public class SlideshowDriver implements AutoCloseable {
             }
             final PreparedSlideContent content = getContentNow();
             return content != null && content.isReadyToSwapOut();
+        }
+
+        public void setAudioSource(final AudioWorldSource source) {
+            final PreparedSlideContent content = getContentNow();
+            if (content != null) {
+                content.setAudioSource(source);
+            }
         }
 
         public void start() {
