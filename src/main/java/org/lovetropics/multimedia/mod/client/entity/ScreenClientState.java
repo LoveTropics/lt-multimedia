@@ -3,7 +3,7 @@ package org.lovetropics.multimedia.mod.client.entity;
 import org.jetbrains.annotations.Nullable;
 import org.lovetropics.multimedia.mod.client.cache.MediaFileCache;
 import org.lovetropics.multimedia.mod.client.slideshow.SlideshowDriver;
-import org.lovetropics.multimedia.mod.config.MultimediaClientConfig;
+import org.lovetropics.multimedia.mod.client.config.MultimediaClientConfig;
 import org.lovetropics.multimedia.mod.entity.ScreenEntity;
 import org.lovetropics.multimedia.mod.slideshow.Slideshow;
 

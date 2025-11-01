@@ -4,7 +4,6 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.syncher.EntityDataSerializer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -29,12 +28,5 @@ public final class MultimediaModNetwork {
         registrar.playToClient(ClientboundPreloadMediaPacket.TYPE, ClientboundPreloadMediaPacket.STREAM_CODEC);
         registrar.playToClient(ClientboundStartSlideshowPacket.TYPE, ClientboundStartSlideshowPacket.STREAM_CODEC);
         registrar.playToClient(ClientboundClearSlideshowPacket.TYPE, ClientboundClearSlideshowPacket.STREAM_CODEC);
-    }
-
-    @SubscribeEvent
-    public static void registerClientHandler(final RegisterClientPayloadHandlersEvent event) {
-        event.register(ClientboundPreloadMediaPacket.TYPE, ClientboundPreloadMediaPacket::handle);
-        event.register(ClientboundStartSlideshowPacket.TYPE, ClientboundStartSlideshowPacket::handle);
-        event.register(ClientboundClearSlideshowPacket.TYPE, ClientboundClearSlideshowPacket::handle);
     }
 }

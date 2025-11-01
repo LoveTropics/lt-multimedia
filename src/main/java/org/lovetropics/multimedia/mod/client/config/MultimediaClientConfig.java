@@ -1,4 +1,4 @@
-package org.lovetropics.multimedia.mod.config;
+package org.lovetropics.multimedia.mod.client.config;
 
 import net.minecraft.client.OptionInstance;
 import net.minecraft.client.Options;

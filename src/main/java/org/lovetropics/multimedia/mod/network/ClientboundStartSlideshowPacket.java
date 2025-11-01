@@ -3,7 +3,6 @@ package org.lovetropics.multimedia.mod.network;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.lovetropics.multimedia.mod.MultimediaMod;
 import org.lovetropics.multimedia.mod.slideshow.Slideshow;
 
@@ -16,10 +15,6 @@ public record ClientboundStartSlideshowPacket(
     );
 
     public static final Type<ClientboundStartSlideshowPacket> TYPE = new Type<>(MultimediaMod.location("start_slideshow"));
-
-    public static void handle(final ClientboundStartSlideshowPacket packet, final IPayloadContext context) {
-        MultimediaMod.slideshowManager().start(packet.sequence());
-    }
 
     @Override
     public Type<ClientboundStartSlideshowPacket> type() {

@@ -8,7 +8,7 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.util.CommonColors;
-import org.lovetropics.multimedia.mod.MultimediaMod;
+import org.lovetropics.multimedia.mod.client.MultimediaClientMod;
 import org.lovetropics.multimedia.mod.client.entity.ScreenClientState;
 import org.lovetropics.multimedia.mod.client.slideshow.SlideshowDriver;
 import org.lovetropics.multimedia.mod.client.slideshow.SlideshowGraphics;
@@ -21,7 +21,7 @@ public class ScreenRenderer extends EntityRenderer<ScreenEntity, ScreenRenderSta
 
     public ScreenRenderer(final EntityRendererProvider.Context context) {
         super(context);
-        slideshowManager = MultimediaMod.slideshowManager();
+        slideshowManager = MultimediaClientMod.slideshowManager();
         font = context.getFont();
     }
 
