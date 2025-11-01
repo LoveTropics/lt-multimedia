@@ -10,18 +10,17 @@ pub struct VideoFrameFormat {
     pixel: format::Pixel,
     width: u32,
     height: u32,
-    stride: usize,
+    stride: Option<usize>,
 }
 
 impl VideoFrameFormat {
     #[inline]
     pub fn new(pixel: format::Pixel, width: u32, height: u32) -> Self {
-        let pixel_descriptor = pixel.descriptor().expect("Pixel has no descriptor");
         VideoFrameFormat {
             pixel,
             width,
             height,
-            stride: width as usize * pixel_descriptor.nb_components() as usize,
+            stride: pixel.descriptor().map(|desc| width as usize * desc.nb_components() as usize),
         }
     }
 
@@ -41,8 +40,8 @@ impl VideoFrameFormat {
     }
 
     #[inline]
-    pub fn bytes(&self) -> usize {
-        self.height as usize * self.stride
+    pub fn bytes(&self) -> Option<usize> {
+        self.stride.map(|stride| stride * self.height as usize)
     }
 }
 
@@ -103,10 +102,11 @@ impl VideoDecoder {
                     .unwrap_or(self.expected_frame_duration);
                 let present_time = self.time_base * present_time as f64;
                 let present_end_time = present_time + present_duration;
+                let format = VideoFrameFormat::new(decoded_frame.format(), decoded_frame.width(), decoded_frame.height());
                 Some(Ok(VideoFrame {
                     resources: self.resources.clone(),
                     frame: Some(decoded_frame),
-                    format: self.format,
+                    format,
                     present_time,
                     present_end_time,
                 }))
@@ -189,7 +189,7 @@ impl VideoFrame {
 
     #[inline]
     pub fn unpack_pixels(self, dst_format: VideoFrameFormat, dst: &mut [u8]) -> Result<usize> {
-        let len_bytes = dst_format.bytes();
+        let len_bytes = dst_format.bytes().expect("Unknown destination size");
         assert!(
             dst.len() >= len_bytes,
             "Destination buffer too small, expected at least {} but was {} (for frame format {:?})",
@@ -287,14 +287,15 @@ impl Converter {
 fn copy_to_buf(src: &frame::Video, dst: &mut [u8], dst_format: VideoFrameFormat) {
     let src_buf = src.data(0);
     let src_stride = src.stride(0);
-    if src_stride == dst_format.stride {
+    let dst_stride = dst_format.stride.expect("Unknown destination stride");
+    if src_stride == dst_stride {
         dst[0..src_buf.len()].copy_from_slice(src_buf);
     } else {
         for y in 0..dst_format.height as usize {
-            let dst_start = y * dst_format.stride;
-            let dst_end = dst_start + dst_format.stride;
+            let dst_start = y * dst_stride;
+            let dst_end = dst_start + dst_stride;
             let src_start = y * src_stride;
-            let src_end = src_start + dst_format.stride;
+            let src_end = src_start + dst_stride;
             dst[dst_start..dst_end].copy_from_slice(&src_buf[src_start..src_end]);
         }
     }
