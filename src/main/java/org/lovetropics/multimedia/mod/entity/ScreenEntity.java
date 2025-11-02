@@ -53,7 +53,7 @@ public class ScreenEntity extends Entity {
         builder.define(DATA_AUDIO_RADIUS, DEFAULT_AUDIO_RADIUS);
     }
 
-    private void setSlideshow(@Nullable final SlideshowHolder slideshow) {
+    public void setSlideshow(@Nullable final SlideshowHolder slideshow) {
         this.slideshow = slideshow;
         getEntityData().set(DATA_CLIENT_SLIDESHOW, Optional.ofNullable(slideshow).map(SlideshowHolder::value));
     }
