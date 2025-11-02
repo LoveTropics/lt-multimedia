@@ -1,6 +1,7 @@
 package org.lovetropics.multimedia.mod.client.playback;
 
 import com.mojang.blaze3d.audio.Channel;
+import com.mojang.blaze3d.audio.ListenerTransform;
 import com.mojang.blaze3d.audio.OpenAlUtil;
 import com.mojang.blaze3d.audio.SoundBuffer;
 import com.mojang.logging.LogUtils;
@@ -102,9 +103,9 @@ import java.util.function.Consumer;
 
     public void setWorldSource(final AudioWorldSource worldSource) {
         this.worldSource = worldSource;
-        final Vec3 listenerPos = soundManager.getListenerTransform().position();
+        final ListenerTransform listenerTransform = soundManager.getListenerTransform();
         linearAttenuation(worldSource.attenuationDistance());
-        setSelfPosition(worldSource.resolveSourcePos(listenerPos));
+        setSelfPosition(worldSource.resolveSourcePos(listenerTransform));
         setRelative(false);
     }
 
@@ -122,8 +123,8 @@ import java.util.function.Consumer;
         }
 
         if (worldSource != null) {
-            final Vec3 listenerPos = soundManager.getListenerTransform().position();
-            setSelfPosition(worldSource.resolveSourcePos(listenerPos));
+            final ListenerTransform listenerTransform = soundManager.getListenerTransform();
+            setSelfPosition(worldSource.resolveSourcePos(listenerTransform));
         }
 
         final int processedBuffers = removeProcessedBuffers();
