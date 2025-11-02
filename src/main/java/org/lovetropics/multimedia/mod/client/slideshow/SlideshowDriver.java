@@ -12,6 +12,7 @@ import org.lovetropics.multimedia.mod.client.cache.MediaFileCache;
 import org.lovetropics.multimedia.mod.client.playback.AudioWorldSource;
 import org.lovetropics.multimedia.mod.client.playback.FrameSize;
 import org.lovetropics.multimedia.mod.client.playback.Playback;
+import org.lovetropics.multimedia.mod.client.playback.PlaybackSyncType;
 import org.lovetropics.multimedia.mod.slideshow.Slide;
 import org.lovetropics.multimedia.mod.slideshow.SlideTransition;
 import org.lovetropics.multimedia.mod.slideshow.Slideshow;
@@ -30,6 +31,7 @@ public class SlideshowDriver implements AutoCloseable {
 
     private final MediaFileCache mediaCache;
     private final Slideshow slideshow;
+    private final PlaybackSyncType syncType;
 
     private float audioVolume = 1.0f;
     @Nullable
@@ -44,10 +46,11 @@ public class SlideshowDriver implements AutoCloseable {
     private float lastFade;
     private float fade;
 
-    public SlideshowDriver(final MediaFileCache mediaCache, final Slideshow slideshow) {
+    public SlideshowDriver(final MediaFileCache mediaCache, final Slideshow slideshow, final PlaybackSyncType syncType) {
         this.mediaCache = mediaCache;
         this.slideshow = slideshow;
         slideQueue.addAll(slideshow.slides());
+        this.syncType = syncType;
     }
 
     public void setAudioVolume(final float volume) {
@@ -88,7 +91,7 @@ public class SlideshowDriver implements AutoCloseable {
         final SlideTransition transitionOut = slide.transitionOut().orElse(slideshow.defaultTransition());
 
         final CompletableFuture<PreparedSlideContent> contentFuture = CompletableFuture.supplyAsync(
-                () -> prepareSlideContent(mediaCache, slide, windowSize),
+                () -> prepareSlideContent(mediaCache, slide, windowSize, syncType),
                 Util.nonCriticalIoPool()
         ).thenCompose(Function.identity());
         return new PreparedSlide(contentFuture.exceptionally(throwable -> {
@@ -97,7 +100,7 @@ public class SlideshowDriver implements AutoCloseable {
         }), transitionIn, transitionOut);
     }
 
-    private static CompletableFuture<PreparedSlideContent> prepareSlideContent(final MediaFileCache mediaCache, final Slide slide, final FrameSize windowSize) {
+    private static CompletableFuture<PreparedSlideContent> prepareSlideContent(final MediaFileCache mediaCache, final Slide slide, final FrameSize windowSize, final PlaybackSyncType syncType) {
         return switch (slide) {
             case final Slide.Video video -> {
                 final SeekableByteChannel channel;
@@ -109,7 +112,7 @@ public class SlideshowDriver implements AutoCloseable {
                 }
                 yield CompletableFuture.supplyAsync(() -> {
                     try {
-                        final Playback playback = Playback.open(channel, windowSize);
+                        final Playback playback = Playback.open(channel, windowSize, syncType);
                         return new PreparedSlideContent.Video(playback, video.volume());
                     } catch (final IOException | DecoderException e) {
                         IOUtils.closeQuietly(channel);

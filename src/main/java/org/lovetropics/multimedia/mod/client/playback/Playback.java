@@ -11,9 +11,7 @@ import org.lovetropics.multimedia.VideoDecoder;
 import javax.annotation.Nullable;
 import javax.sound.sampled.AudioFormat;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.channels.SeekableByteChannel;
-import java.nio.file.Path;
 
 public class Playback implements AutoCloseable {
     /* package-private */ static final Thread.Builder IO_THREAD_BUILDER = Thread.ofPlatform()
@@ -35,15 +33,18 @@ public class Playback implements AutoCloseable {
 
     private final VideoFrameTexture texture;
 
-    private final PlaybackClock clock = new PlaybackClock();
+    private final PlaybackClock clock;
 
     private Playback(
             final MultimediaReader reader,
             final VideoDecoder videoDecoder,
             @Nullable final AudioDecoder audioDecoder,
-            final FrameSize windowSize
+            final FrameSize windowSize,
+            final PlaybackSyncType syncType
     ) {
         sourceFrameSize = new FrameSize(videoDecoder.width(), videoDecoder.height());
+        clock = new PlaybackClock(syncType);
+
         packetReader = new PacketReader(reader);
         videoFrameUploader = new VideoFrameUploader(RenderSystem.getDevice(), fitTextureSize(windowSize), clock);
         this.videoDecoder = new PlaybackVideoDecoder(packetReader, videoDecoder, videoFrameUploader);
@@ -58,25 +59,17 @@ public class Playback implements AutoCloseable {
         PlaybackManager.register(this);
     }
 
-    public static Playback open(final Path path, final FrameSize windowSize) throws IOException, DecoderException {
-        return open(MultimediaReader.open(path), windowSize);
+    public static Playback open(final SeekableByteChannel channel, final FrameSize windowSize, final PlaybackSyncType syncType) throws IOException, DecoderException {
+        return open(MultimediaReader.open(channel), windowSize, syncType);
     }
 
-    public static Playback open(final InputStream input, final FrameSize windowSize) throws IOException, DecoderException {
-        return open(MultimediaReader.open(input), windowSize);
-    }
-
-    public static Playback open(final SeekableByteChannel channel, final FrameSize windowSize) throws IOException, DecoderException {
-        return open(MultimediaReader.open(channel), windowSize);
-    }
-
-    private static Playback open(final MultimediaReader reader, final FrameSize windowSize) throws IOException, DecoderException {
+    private static Playback open(final MultimediaReader reader, final FrameSize windowSize, final PlaybackSyncType syncType) throws IOException, DecoderException {
         final VideoDecoder videoDecoder = reader.openVideoDecoder();
         if (videoDecoder == null) {
             throw new IOException("Media has no video stream");
         }
         final AudioDecoder audioDecoder = reader.openAudioDecoder(MONO_AUDIO_FORMAT);
-        return new Playback(reader, videoDecoder, audioDecoder, windowSize);
+        return new Playback(reader, videoDecoder, audioDecoder, windowSize, syncType);
     }
 
     private FrameSize fitTextureSize(final FrameSize windowSize) {

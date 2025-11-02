@@ -7,15 +7,14 @@ import com.mojang.blaze3d.audio.SoundBuffer;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.sounds.ChannelAccess;
 import net.minecraft.client.sounds.SoundManager;
+import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.lovetropics.multimedia.AudioDecoder;
 import org.lovetropics.multimedia.AudioFrame;
 import org.lovetropics.multimedia.AudioPacket;
 import org.lovetropics.multimedia.DecoderException;
-import org.lwjgl.BufferUtils;
 import org.lwjgl.openal.AL10;
-import org.lwjgl.openal.AL11;
 import org.slf4j.Logger;
 
 import java.nio.ByteBuffer;
@@ -31,13 +30,21 @@ import java.util.function.Consumer;
     // Ensure we have enough audio to fill the space between ticks, even at a low tick/frame rate
     private static final double QUEUE_AT_LEAST_SECONDS = 0.25;
 
+    private static final double MAX_CLOCK_DRIFT = 0.1;
+    private static final double CORRECT_OVER_SECONDS = 5.0;
+
     private final SoundManager soundManager;
     private final PacketReader packets;
     private final AudioDecoder decoder;
     private final PlaybackClock clock;
 
+    private final AudioSampler sampler;
+
     private final Deque<Double> queuedFrameEndTimes = new ArrayDeque<>();
     private double lastPlayedFrameEndTime;
+
+    @Nullable
+    private ClockCorrection activeCorrection;
 
     @Nullable
     private AudioWorldSource worldSource;
@@ -50,6 +57,7 @@ import java.util.function.Consumer;
         this.packets = packets;
         this.decoder = decoder;
         this.clock = clock;
+        sampler = new AudioSampler(decoder.format());
 
         setVolume(1.0f);
         setPitch(1.0f);
@@ -68,7 +76,6 @@ import java.util.function.Consumer;
                 return null;
             }
             final AudioPlaybackChannel channel = new AudioPlaybackChannel(sources[0], soundManager, packets, decoder, clock);
-            channel.tryQueueFrames(QUEUE_AT_LEAST_SECONDS, true);
             channelAccess.channels.add(createChannelHandle(channelAccess, channel));
             return channel;
         }, channelAccess.executor);
@@ -109,6 +116,18 @@ import java.util.function.Consumer;
         setRelative(false);
     }
 
+    private void reset() {
+        // Bit of a hack - the source must not be in the AL_INITIAL state in order to unqueue its buffers
+        if (AL10.alGetSourcei(source, AL10.AL_SOURCE_STATE) == AL10.AL_INITIAL) {
+            play();
+        }
+        stop();
+        unqueueBuffers(queuedFrameEndTimes.size());
+        queuedFrameEndTimes.clear();
+        lastPlayedFrameEndTime = 0.0;
+        activeCorrection = null;
+    }
+
     // ChannelAccess will delete this channel if it ever reports being stopped - we might pause for a bit if we're
     // lagging behind, but we don't want to actually stop until the playback is over.
     @Override
@@ -127,16 +146,13 @@ import java.util.function.Consumer;
             setSelfPosition(worldSource.resolveSourcePos(listenerTransform));
         }
 
-        final int processedBuffers = removeProcessedBuffers();
+        final int processedBuffers = playing() ? removeProcessedBuffers() : 0;
         for (int i = 0; i < processedBuffers; i++) {
             lastPlayedFrameEndTime = queuedFrameEndTimes.removeFirst();
         }
 
-        // The clock should always be somewhere within the frame that we know to be currently playing
-        final double currentFrameEndTime = Objects.requireNonNullElse(queuedFrameEndTimes.peekFirst(), lastPlayedFrameEndTime);
-        clock.ensureInRange(lastPlayedFrameEndTime, currentFrameEndTime);
-
-        tryQueueFrames(lastPlayedFrameEndTime + QUEUE_AT_LEAST_SECONDS, false);
+        final double speedFactor = syncClocks();
+        tryQueueFrames(lastPlayedFrameEndTime + QUEUE_AT_LEAST_SECONDS, speedFactor);
 
         if (!playing() && !clock.isPaused()) {
             if (!queuedFrameEndTimes.isEmpty()) {
@@ -148,23 +164,48 @@ import java.util.function.Consumer;
         }
     }
 
-    private void tryQueueFrames(final double queueUntilTime, final boolean block) {
+    private double syncClocks() {
+        if (clock.syncType() == PlaybackSyncType.AUDIO) {
+            // The clock should always be somewhere within the frame that we know to be currently playing
+            final double currentFrameEndTime = Objects.requireNonNullElse(queuedFrameEndTimes.peekFirst(), lastPlayedFrameEndTime);
+            clock.ensureInRange(lastPlayedFrameEndTime, currentFrameEndTime);
+
+            return 1.0;
+        } else {
+            final double clockTime = clock.getElapsedTime();
+            if (activeCorrection != null && clockTime > activeCorrection.finishAt) {
+                activeCorrection = null;
+            }
+
+            final double clockDrift = clockTime - lastPlayedFrameEndTime;
+            if (activeCorrection == null && Math.abs(clockDrift) > MAX_CLOCK_DRIFT) {
+                activeCorrection = new ClockCorrection(
+                        Mth.clamp(1.0 + clockDrift / CORRECT_OVER_SECONDS, 0.5, 2.0),
+                        clockTime + CORRECT_OVER_SECONDS / 2.0
+                );
+            }
+
+            return activeCorrection != null ? activeCorrection.speedFactor : 1.0;
+        }
+    }
+
+    private void tryQueueFrames(final double queueUntilTime, final double speedFactor) {
         try {
-            queueFrames(queueUntilTime, block);
+            queueFrames(queueUntilTime, speedFactor);
         } catch (final DecoderException e) {
             LOGGER.error("Failed to read from audio stream", e);
             scheduleClose();
         }
     }
 
-    private void queueFrames(final double queueUntilTime, final boolean block) throws DecoderException {
+    private void queueFrames(final double queueUntilTime, final double speedFactor) throws DecoderException {
         while (queuedFrameEndTimes.isEmpty() || queuedFrameEndTimes.getLast() < queueUntilTime) {
             final AudioFrame frame = decoder.readFrame();
             if (frame != null) {
-                queueFrame(frame);
+                queueFrame(frame, speedFactor);
                 continue;
             }
-            final AudioPacket packet = block ? packets.takeAudioPacket() : packets.pollAudioPacket();
+            final AudioPacket packet = packets.pollAudioPacket();
             if (packet == null) {
                 break;
             }
@@ -174,13 +215,12 @@ import java.util.function.Consumer;
         }
     }
 
-    private void queueFrame(final AudioFrame frame) throws DecoderException {
+    private void queueFrame(final AudioFrame frame, final double speedFactor) throws DecoderException {
         try (frame) {
             final double frameDuration = (double) frame.samples() / decoder.format().getSampleRate();
             final double frameEndTime = frame.presentTime() + frameDuration;
-            final ByteBuffer buffer = BufferUtils.createByteBuffer(frame.bytes());
-            frame.unpackSamples(buffer);
-            new SoundBuffer(buffer.flip(), decoder.format()).releaseAlBuffer().ifPresent(id -> {
+            final ByteBuffer buffer = sampler.sample(frame, Mth.floor(frame.samples() / speedFactor));
+            new SoundBuffer(buffer, decoder.format()).releaseAlBuffer().ifPresent(id -> {
                 AL10.alSourceQueueBuffers(source, new int[]{id});
                 queuedFrameEndTimes.addLast(frameEndTime);
             });
@@ -188,16 +228,20 @@ import java.util.function.Consumer;
     }
 
     private int removeProcessedBuffers() {
-        final int bufferCount = AL10.alGetSourcei(source, AL11.AL_BUFFERS_PROCESSED);
+        final int bufferCount = AL10.alGetSourcei(source, AL10.AL_BUFFERS_PROCESSED);
+        unqueueBuffers(bufferCount);
+        return bufferCount;
+    }
+
+    private void unqueueBuffers(final int bufferCount) {
         if (bufferCount == 0) {
-            return 0;
+            return;
         }
         final int[] buffers = new int[bufferCount];
         AL10.alSourceUnqueueBuffers(source, buffers);
         OpenAlUtil.checkALError("Unqueue buffers");
         AL10.alDeleteBuffers(buffers);
         OpenAlUtil.checkALError("Remove processed buffers");
-        return bufferCount;
     }
 
     public void scheduleClose() {
@@ -213,8 +257,12 @@ import java.util.function.Consumer;
 
     @Override
     public void destroy() {
+        reset();
         super.destroy();
         decoder.close();
+    }
+
+    private record ClockCorrection(double speedFactor, double finishAt) {
     }
 
     /* package-private */ static class Handle implements AutoCloseable {

@@ -5,47 +5,58 @@ import net.minecraft.util.Mth;
 
 public class PlaybackClock {
     private static final long TIME_NOT_SET = -1;
+    private static final double SECONDS_TO_NANOS = 1000_000_000.0;
+
+    private final PlaybackSyncType syncType;
 
     private volatile long startedAt = TIME_NOT_SET;
     private volatile long pausedAt = TIME_NOT_SET;
 
-    public void play() {
+    public PlaybackClock(final PlaybackSyncType syncType) {
+        this.syncType = syncType;
+    }
+
+    public PlaybackSyncType syncType() {
+        return syncType;
+    }
+
+    public synchronized void play() {
         if (startedAt == TIME_NOT_SET) {
-            startedAt = Util.getMillis();
+            startedAt = Util.getNanos();
         } else if (pausedAt != TIME_NOT_SET) {
             final long elapsedMillis = pausedAt - startedAt;
-            startedAt = Util.getMillis() - elapsedMillis;
+            startedAt = Util.getNanos() - elapsedMillis;
             pausedAt = TIME_NOT_SET;
         }
     }
 
-    public void pause() {
+    public synchronized void pause() {
         if (pausedAt == TIME_NOT_SET) {
             pausedAt = getCurrentTimestamp();
         }
     }
 
-    public void ensureInRange(final double frameStartTime, final double frameEndTime) {
+    public synchronized void ensureInRange(final double frameStartTime, final double frameEndTime) {
         if (isPaused()) {
             return;
         }
         final long currentTimestamp = getCurrentTimestamp();
-        final double elapsedTime = (currentTimestamp - startedAt) / 1000.0;
+        final double elapsedTime = (currentTimestamp - startedAt) / SECONDS_TO_NANOS;
         if (elapsedTime < frameStartTime || elapsedTime > frameEndTime) {
             final double adjustedElapsedTime = Mth.clamp(elapsedTime, frameStartTime, frameEndTime);
-            startedAt = Mth.floor(currentTimestamp - adjustedElapsedTime * 1000.0);
+            startedAt = (long) Math.floor(currentTimestamp - adjustedElapsedTime * SECONDS_TO_NANOS);
         }
     }
 
     private long getCurrentTimestamp() {
-        return pausedAt != TIME_NOT_SET ? pausedAt : Util.getMillis();
+        return pausedAt != TIME_NOT_SET ? pausedAt : Util.getNanos();
     }
 
     public double getElapsedTime() {
         if (startedAt == TIME_NOT_SET) {
             return 0.0;
         }
-        return (getCurrentTimestamp() - startedAt) / 1000.0;
+        return (getCurrentTimestamp() - startedAt) / SECONDS_TO_NANOS;
     }
 
     public boolean isPaused() {

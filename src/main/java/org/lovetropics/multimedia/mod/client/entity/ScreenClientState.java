@@ -2,6 +2,7 @@ package org.lovetropics.multimedia.mod.client.entity;
 
 import org.jetbrains.annotations.Nullable;
 import org.lovetropics.multimedia.mod.client.cache.MediaFileCache;
+import org.lovetropics.multimedia.mod.client.playback.PlaybackSyncType;
 import org.lovetropics.multimedia.mod.client.slideshow.SlideshowDriver;
 import org.lovetropics.multimedia.mod.client.config.MultimediaClientConfig;
 import org.lovetropics.multimedia.mod.entity.ScreenEntity;
@@ -19,7 +20,7 @@ public class ScreenClientState implements AutoCloseable {
         }
         if (slideshow != null && driver == null) {
             slideshow.ensureDownloaded(mediaCache);
-            driver = new SlideshowDriver(mediaCache, slideshow);
+            driver = new SlideshowDriver(mediaCache, slideshow, PlaybackSyncType.WALL_TIME);
         }
 
         if (driver != null) {

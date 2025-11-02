@@ -16,6 +16,7 @@ import net.neoforged.neoforge.event.level.LevelEvent;
 import org.lovetropics.multimedia.mod.MultimediaMod;
 import org.lovetropics.multimedia.mod.client.cache.MediaFileCache;
 import org.lovetropics.multimedia.mod.client.entity.ScreenClientState;
+import org.lovetropics.multimedia.mod.client.playback.PlaybackSyncType;
 import org.lovetropics.multimedia.mod.entity.ScreenEntity;
 import org.lovetropics.multimedia.mod.slideshow.Slideshow;
 
@@ -94,7 +95,7 @@ public class SlideshowManager {
 
     public void start(final Slideshow slideshow) {
         slideshow.ensureDownloaded(mediaCache);
-        fullScreenSlideshow = new FullScreenSlideshow(new SlideshowDriver(mediaCache, slideshow));
+        fullScreenSlideshow = new FullScreenSlideshow(new SlideshowDriver(mediaCache, slideshow, PlaybackSyncType.AUDIO));
     }
 
     public void clear() {

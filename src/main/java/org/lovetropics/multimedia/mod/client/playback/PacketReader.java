@@ -56,15 +56,6 @@ import java.util.concurrent.locks.ReentrantLock;
     }
 
     @Nullable
-    public AudioPacket takeAudioPacket() {
-        try {
-            return audioQueue.take();
-        } catch (final InterruptedException e) {
-            return null;
-        }
-    }
-
-    @Nullable
     public AudioPacket pollAudioPacket() {
         return audioQueue.poll();
     }
