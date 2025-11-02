@@ -14,6 +14,7 @@ import org.lovetropics.multimedia.AudioDecoder;
 import org.lovetropics.multimedia.AudioFrame;
 import org.lovetropics.multimedia.AudioPacket;
 import org.lovetropics.multimedia.DecoderException;
+import org.lovetropics.multimedia.mod.slideshow.Slide;
 import org.lwjgl.openal.AL10;
 import org.slf4j.Logger;
 
@@ -58,7 +59,11 @@ import java.util.function.Consumer;
         this.decoder = decoder;
         this.clock = clock;
         sampler = new AudioSampler(decoder.format());
+        setupSource();
+    }
 
+    private void setupSource() {
+        AL10.alSourcef(source, AL10.AL_MAX_GAIN, Slide.MAX_VOLUME);
         setVolume(1.0f);
         setPitch(1.0f);
         disableAttenuation();

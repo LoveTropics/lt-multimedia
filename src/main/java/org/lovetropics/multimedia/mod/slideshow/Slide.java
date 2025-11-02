@@ -6,7 +6,6 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.util.StringRepresentable;
 import org.lovetropics.multimedia.mod.MediaFile;
 
-import java.awt.*;
 import java.time.Duration;
 import java.util.Optional;
 
@@ -15,6 +14,8 @@ public sealed interface Slide {
             seconds -> Duration.ofMillis((long) (seconds * 1000)),
             duration -> duration.toMillis() / 1000.0f
     );
+
+    float MAX_VOLUME = 10.0f;
 
     Codec<Slide> CODEC = Type.CODEC.dispatch(Slide::type, type -> type.codec);
 
@@ -36,7 +37,7 @@ public sealed interface Slide {
                 MediaFile.CODEC.fieldOf("file").forGetter(Video::file),
                 SlideTransition.CODEC.optionalFieldOf("transition_in").forGetter(Video::transitionIn),
                 SlideTransition.CODEC.optionalFieldOf("transition_out").forGetter(Video::transitionOut),
-                Codec.FLOAT.optionalFieldOf("volume", 1.0f).forGetter(Video::volume)
+                Codec.floatRange(0.0f, MAX_VOLUME).optionalFieldOf("volume", 1.0f).forGetter(Video::volume)
         ).apply(i, Video::new));
 
         @Override
