@@ -49,8 +49,8 @@ impl VideoFrameFormat {
 pub struct VideoPacket(pub(super) InnerPacket);
 
 impl VideoPacket {
-    pub(super) fn new(packet: ffmpeg::Packet) -> Self {
-        VideoPacket(InnerPacket::Packet(packet))
+    pub(super) fn new(packet: ffmpeg::Packet, flush: bool) -> Self {
+        VideoPacket(InnerPacket::Packet { packet, flush })
     }
 
     pub(super) fn eof() -> Self {

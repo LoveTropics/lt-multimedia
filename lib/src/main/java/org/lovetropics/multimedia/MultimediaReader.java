@@ -127,6 +127,11 @@ public final class MultimediaReader implements Closeable {
         throw new IllegalArgumentException("Unsupported encoding: " + encoding + " with " + sampleBits + " bits");
     }
 
+    public synchronized void seekUpTo(final double time) throws IOException {
+        checkOpen();
+        MultimediaNative.seekUpTo(handle, time);
+    }
+
     @Override
     public synchronized void close() throws IOException {
         if (closed) {

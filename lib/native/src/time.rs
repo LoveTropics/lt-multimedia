@@ -12,6 +12,15 @@ pub const fn to_duration(time: i64, time_base: ffmpeg::Rational) -> Duration {
     }
 }
 
+#[inline]
+pub const fn from_duration(time: Duration, time_base: ffmpeg::Rational) -> i64 {
+    if time_base.0 == 1 && time_base.1 == 1000_000 {
+        time.as_micros() as i64
+    } else {
+        (time.as_micros() as i64 * time_base.1 as i64) / (1000_000 * time_base.0 as i64)
+    }
+}
+
 pub fn frame_present_time(frame: &ffmpeg::Frame, time_base: ffmpeg::Rational) -> Duration {
     let present_time = frame
         .timestamp()

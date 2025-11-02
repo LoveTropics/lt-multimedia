@@ -13,7 +13,7 @@ use std::path::Path;
 use std::pin::Pin;
 use std::sync::Once;
 use std::time::Duration;
-use std::{io, ptr, slice};
+use std::{io, mem, ptr, slice};
 pub use video::*;
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -71,6 +71,8 @@ pub struct MultimediaReader<R> {
     duration: Duration,
     video_stream_index: Option<usize>,
     audio_stream_index: Option<usize>,
+    flush_video: bool,
+    flush_audio: bool,
     video_eof: bool,
     audio_eof: bool,
 }
@@ -129,6 +131,8 @@ impl<R> MultimediaReader<R> {
             duration,
             video_stream_index,
             audio_stream_index,
+            flush_video: false,
+            flush_audio: false,
             video_eof: false,
             audio_eof: false,
         })
@@ -139,9 +143,11 @@ impl<R> MultimediaReader<R> {
             match self.input.packets().next() {
                 Some((stream, packet)) => {
                     if Some(stream.index()) == self.video_stream_index {
-                        break Some(Ok(MultimediaPacket::Video(VideoPacket::new(packet))));
+                        let flush = mem::replace(&mut self.flush_video, false);
+                        break Some(Ok(MultimediaPacket::Video(VideoPacket::new(packet, flush))));
                     } else if Some(stream.index()) == self.audio_stream_index {
-                        break Some(Ok(MultimediaPacket::Audio(AudioPacket::new(packet))));
+                        let flush = mem::replace(&mut self.flush_audio, false);
+                        break Some(Ok(MultimediaPacket::Audio(AudioPacket::new(packet, flush))));
                     }
                 }
                 None => {
@@ -184,6 +190,15 @@ impl<R> MultimediaReader<R> {
     #[inline]
     pub fn duration(&self) -> Duration {
         self.duration
+    }
+
+    #[inline]
+    pub fn seek_up_to(&mut self, timestamp: Duration) -> Result<()> {
+        let timestamp = time::from_duration(timestamp, time::AV_TIME_BASE);
+        self.input.seek(timestamp, ..timestamp + 1)?;
+        self.flush_video = true;
+        self.flush_audio = true;
+        Ok(())
     }
 }
 
@@ -298,15 +313,27 @@ pub trait Frames {
 }
 
 pub(crate) enum InnerPacket {
-    Packet(ffmpeg::Packet),
+    Packet {
+        packet: ffmpeg::Packet,
+        flush: bool,
+    },
     Eof,
 }
 
 impl InnerPacket {
-    pub fn send_to(self, decoder: &mut ffmpeg::decoder::Opened) -> Result<(), ffmpeg::Error> {
+    pub fn send_to(self, decoder: &mut ffmpeg::decoder::Opened) -> Result<bool, ffmpeg::Error> {
         match self {
-            InnerPacket::Packet(packet) => decoder.send_packet(&packet),
-            InnerPacket::Eof => decoder.send_eof(),
+            InnerPacket::Packet { packet, flush } => {
+                if flush {
+                    decoder.flush();
+                }
+                decoder.send_packet(&packet)?;
+                Ok(flush)
+            },
+            InnerPacket::Eof => {
+                decoder.send_eof()?;
+                Ok(false)
+            },
         }
     }
 }

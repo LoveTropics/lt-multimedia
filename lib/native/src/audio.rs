@@ -42,8 +42,8 @@ impl AudioFrameFormat {
 pub struct AudioPacket(pub(super) InnerPacket);
 
 impl AudioPacket {
-    pub(super) fn new(packet: ffmpeg::Packet) -> Self {
-        AudioPacket(InnerPacket::Packet(packet))
+    pub(super) fn new(packet: ffmpeg::Packet, flush: bool) -> Self {
+        AudioPacket(InnerPacket::Packet { packet, flush })
     }
 
     pub(super) fn eof() -> Self {
@@ -58,8 +58,11 @@ pub struct AudioDecoder {
     decoder: decoder::Audio,
     resampler: software::resampling::Context,
     src_frame: frame::Audio,
+    src_time_base: ffmpeg::Rational,
     dst_sample_duration: ffmpeg::Rational,
-    current_samples: u64,
+
+    dst_base_timestamp: Option<Duration>,
+    current_dst_samples: u64,
 }
 
 impl AudioDecoder {
@@ -67,15 +70,9 @@ impl AudioDecoder {
         let decoder = codec::context::Context::from_parameters(stream.parameters())?
             .decoder()
             .audio()?;
+        let src_time_base = decoder.time_base();
 
-        let resampler = software::resampling::Context::get(
-            decoder.format(),
-            decoder.channel_layout(),
-            decoder.rate(),
-            dst_format.sample,
-            dst_format.channel_layout,
-            dst_format.sample_rate,
-        ).expect("Failed to create resampling context");
+        let resampler = Self::create_resampler(&decoder, dst_format);
 
         Ok(AudioDecoder {
             resources: Arc::new(DecoderResources {
@@ -85,9 +82,22 @@ impl AudioDecoder {
             decoder,
             resampler,
             src_frame: frame::Audio::empty(),
+            src_time_base,
             dst_sample_duration: ffmpeg::Rational(1, dst_format.sample_rate as i32),
-            current_samples: 0,
+            dst_base_timestamp: None,
+            current_dst_samples: 0,
         })
+    }
+
+    fn create_resampler(decoder: &decoder::Audio, dst_format: AudioFrameFormat) -> software::resampling::Context {
+        software::resampling::Context::get(
+            decoder.format(),
+            decoder.channel_layout(),
+            decoder.rate(),
+            dst_format.sample,
+            dst_format.channel_layout,
+            dst_format.sample_rate,
+        ).expect("Failed to create resampling context")
     }
 
     fn receive_frame(&mut self) -> Option<Result<AudioFrame>> {
@@ -101,6 +111,9 @@ impl AudioDecoder {
 
         match self.decoder.receive_frame(&mut self.src_frame) {
             Ok(_) => {
+                if self.dst_base_timestamp.is_none() {
+                    self.dst_base_timestamp = Some(time::frame_present_time(&self.src_frame, self.src_time_base));
+                }
                 let result = self.resampler.run(&self.src_frame, &mut dst_frame);
                 self.handle_resample_result(result, dst_frame)
             }
@@ -118,8 +131,8 @@ impl AudioDecoder {
     fn handle_resample_result(&mut self, result: Result<Option<software::resampling::Delay>, ffmpeg::Error>, dst_frame: frame::Audio) -> Option<Result<AudioFrame>> {
         match result {
             Ok(_) => {
-                let present_time = time::to_duration(self.current_samples as i64, self.dst_sample_duration);
-                self.current_samples += dst_frame.samples() as u64;
+                let present_time = self.dst_base_timestamp.unwrap() + time::to_duration(self.current_dst_samples as i64, self.dst_sample_duration);
+                self.current_dst_samples += dst_frame.samples() as u64;
                 Some(Ok(AudioFrame {
                     resources: self.resources.clone(),
                     frame: Some(dst_frame),
@@ -142,7 +155,14 @@ impl FrameDecoder for AudioDecoder {
     #[inline]
     fn send_packet(mut self, packet: AudioPacket) -> Result<AudioFrames> {
         match packet.0.send_to(&mut self.decoder) {
-            Ok(_) => Ok(AudioFrames(self)),
+            Ok(flushed) => {
+                if flushed {
+                    self.resampler = Self::create_resampler(&self.decoder, self.resources.format);
+                    self.dst_base_timestamp = None;
+                    self.current_dst_samples = 0;
+                }
+                Ok(AudioFrames(self))
+            }
             Err(err) => Err(err.into()),
         }
     }

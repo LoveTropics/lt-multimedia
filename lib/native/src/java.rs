@@ -156,6 +156,19 @@ pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_g
 
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]
+pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_seekUpTo<'a>(
+    env: JNIEnv<'a>,
+    _class: JClass<'a>,
+    reader: jlong,
+    time: jdouble,
+) {
+    let reader: &mut JMultimediaReader = unsafe { from_java_ptr(&env, reader) };
+    let result = reader.seek_up_to(Duration::from_secs_f64(time));
+    handle_result(env, result, ())
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
 pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_openVideoDecoder<'a>(
     env: JNIEnv<'a>,
     _class: JClass<'a>,
@@ -469,6 +482,10 @@ impl JMultimediaReader {
 
     fn duration(&self) -> Duration {
         forward_reader!(self, reader => reader.duration())
+    }
+
+    fn seek_up_to(&mut self, timestamp: Duration) -> Result<()> {
+        forward_reader!(self, reader => reader.seek_up_to(timestamp))
     }
 }
 
