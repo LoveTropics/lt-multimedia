@@ -24,6 +24,7 @@ public class Playback implements AutoCloseable {
     private static final AudioFormat MONO_AUDIO_FORMAT = new AudioFormat(44100, 16, 1, true, false);
 
     private final FrameSize sourceFrameSize;
+    private final double sourceDuration;
 
     private final PacketReader packetReader;
     private final PlaybackVideoDecoder videoDecoder;
@@ -43,6 +44,8 @@ public class Playback implements AutoCloseable {
             final PlaybackSyncType syncType
     ) {
         sourceFrameSize = new FrameSize(videoDecoder.width(), videoDecoder.height());
+        sourceDuration = reader.duration();
+
         clock = new PlaybackClock(syncType);
 
         packetReader = new PacketReader(reader);
@@ -129,8 +132,12 @@ public class Playback implements AutoCloseable {
         }
     }
 
-    public boolean hasStopped() {
-        return videoDecoder.isClosed() && (audioPlayback == null || audioPlayback.isStopped());
+    public double currentTime() {
+        return clock.getElapsedTime();
+    }
+
+    public double duration() {
+        return sourceDuration;
     }
 
     @Nullable

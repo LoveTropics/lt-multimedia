@@ -159,13 +159,9 @@ import java.util.function.Consumer;
         final double speedFactor = syncClocks();
         tryQueueFrames(lastPlayedFrameEndTime + QUEUE_AT_LEAST_SECONDS, speedFactor);
 
-        if (!playing() && !clock.isPaused()) {
-            if (!queuedFrameEndTimes.isEmpty()) {
-                // Somehow ran out of samples, but we're ready to resume again
-                play();
-            } else if (!packets.hasRemainingAudio()) {
-                scheduleClose();
-            }
+        if (!playing() && !clock.isPaused() && !queuedFrameEndTimes.isEmpty()) {
+            // Somehow ran out of samples, but we're ready to resume again
+            play();
         }
     }
 
@@ -286,11 +282,6 @@ import java.util.function.Consumer;
         @Override
         public void close() {
             execute(AudioPlaybackChannel::scheduleClose);
-        }
-
-        public boolean isStopped() {
-            final AudioPlaybackChannel channel = inner.getNow(null);
-            return channel != null && channel.stopped();
         }
     }
 }

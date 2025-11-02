@@ -30,6 +30,7 @@ import java.util.concurrent.locks.ReentrantLock;
     private final PacketQueue<VideoPacket> videoQueue = new PacketQueue<>(MAX_QUEUE_CAPACITY, PREFERRED_QUEUE_SIZE);
     private final PacketQueue<AudioPacket> audioQueue = new PacketQueue<>(MAX_QUEUE_CAPACITY, PREFERRED_QUEUE_SIZE);
 
+    private volatile boolean eof;
     private volatile boolean sleeping;
     private volatile boolean closed;
 
@@ -62,20 +63,23 @@ import java.util.concurrent.locks.ReentrantLock;
 
     private void run() {
         try {
-            MultimediaPacket packet;
-            while (!closed && (packet = reader.readPacket()) != null) {
-                enqueueAndSleep(packet);
+            while (!closed) {
+                final MultimediaPacket packet = reader.readPacket();
+                if (packet != null) {
+                    enqueueAndSleep(packet);
+                } else {
+                    markEofAndSleep();
+                }
             }
         } catch (final InterruptedException ignored) {
             // Closed from the main thread, stop immediately
         } catch (final IOException e) {
             LOGGER.error("Failed to read packet from stream", e);
         } finally {
-            closed = true;
             lock.lock();
             try {
-                videoQueue.signalClosed();
-                audioQueue.signalClosed();
+                videoQueue.discard();
+                audioQueue.discard();
             } finally {
                 lock.unlock();
             }
@@ -108,7 +112,22 @@ import java.util.concurrent.locks.ReentrantLock;
         }
     }
 
+    private void markEofAndSleep() throws InterruptedException {
+        lock.lock();
+        try {
+            eof = true;
+            sleeping = true;
+            wakeUp.await();
+            sleeping = false;
+        } finally {
+            lock.unlock();
+        }
+    }
+
     private boolean shouldSleep() {
+        if (eof) {
+            return true;
+        }
         if (!videoQueue.wantsPacket() && !audioQueue.wantsPacket()) {
             return true;
         }
@@ -118,10 +137,6 @@ import java.util.concurrent.locks.ReentrantLock;
         } else {
             return !(videoQueue.canAcceptPacket() && audioQueue.canAcceptPacket());
         }
-    }
-
-    public boolean hasRemainingAudio() {
-        return !closed || !audioQueue.isEmpty();
     }
 
     @Override
@@ -166,8 +181,10 @@ import java.util.concurrent.locks.ReentrantLock;
             return discard || queue.size() < capacity;
         }
 
-        public boolean isEmpty() {
-            return queue.isEmpty();
+        private void maybeWakeUp() {
+            if (sleeping && !shouldSleep()) {
+                wakeUp.signal();
+            }
         }
 
         @Nullable
@@ -177,7 +194,9 @@ import java.util.concurrent.locks.ReentrantLock;
             }
             lock.lock();
             try {
-                return queue.poll();
+                final P packet = queue.poll();
+                maybeWakeUp();
+                return packet;
             } finally {
                 lock.unlock();
             }
@@ -192,9 +211,7 @@ import java.util.concurrent.locks.ReentrantLock;
             try {
                 while (!discard) {
                     final P packet = queue.poll();
-                    if (sleeping && !shouldSleep()) {
-                        wakeUp.signal();
-                    }
+                    maybeWakeUp();
                     if (packet != null || closed) {
                         return packet;
                     }
@@ -208,6 +225,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
         public boolean enqueue(final P packet) {
             if (discard) {
+                packet.close();
                 return false;
             }
             lock.lock();
@@ -228,15 +246,6 @@ import java.util.concurrent.locks.ReentrantLock;
                 while ((packet = queue.poll()) != null) {
                     packet.close();
                 }
-                hasPacket.signal();
-            } finally {
-                lock.unlock();
-            }
-        }
-
-        public void signalClosed() {
-            lock.lock();
-            try {
                 hasPacket.signal();
             } finally {
                 lock.unlock();

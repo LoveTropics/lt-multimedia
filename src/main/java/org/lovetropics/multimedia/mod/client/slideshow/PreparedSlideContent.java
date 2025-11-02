@@ -30,7 +30,7 @@ public interface PreparedSlideContent extends AutoCloseable {
     record Video(Playback playback, float volume) implements PreparedSlideContent {
         @Override
         public boolean isReadyToSwapOut() {
-            return playback.hasStopped();
+            return playback.currentTime() >= playback.duration();
         }
 
         @Override
