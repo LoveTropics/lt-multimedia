@@ -36,6 +36,8 @@ public class MultimediaNative {
 
     public static native void destroyReader(long reader) throws IOException;
 
+    public static native double getDuration(long reader);
+
     public static native long readPacket(long reader) throws IOException;
 
     public static native void destroyPacket(long packet);

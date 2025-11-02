@@ -106,6 +106,17 @@ pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_d
 
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]
+pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_getDuration<'a>(
+    env: JNIEnv<'a>,
+    _class: JClass<'a>,
+    reader: jlong,
+) -> jdouble {
+    let reader: &mut JMultimediaReader = unsafe { from_java_ptr(&env, reader) };
+    reader.duration().as_secs_f64()
+}
+
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
 pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_readPacket<'a>(
     env: JNIEnv<'a>,
     _class: JClass<'a>,
@@ -454,6 +465,10 @@ impl JMultimediaReader {
 
     fn open_audio_decoder(&mut self, format: AudioFrameFormat) -> Result<Option<AudioDecoder>> {
         forward_reader!(self, reader => reader.open_audio_decoder(format))
+    }
+
+    fn duration(&self) -> Duration {
+        forward_reader!(self, reader => reader.duration())
     }
 }
 

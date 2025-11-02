@@ -12,6 +12,7 @@ use std::ffi::{c_int, c_uchar, c_void, CString, NulError};
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Once;
+use std::time::Duration;
 use std::{io, ptr, slice};
 pub use video::*;
 
@@ -67,6 +68,7 @@ pub struct MultimediaReader<R> {
     // Must be pinned, as it is implicitly referenced by the ffmpeg input context
     read_state: Pin<Box<ReadState<R>>>,
 
+    duration: Duration,
     video_stream_index: Option<usize>,
     audio_stream_index: Option<usize>,
     video_eof: bool,
@@ -119,9 +121,12 @@ impl<R> MultimediaReader<R> {
         let video_stream_index = input.streams().best(media::Type::Video).map(|s| s.index());
         let audio_stream_index = input.streams().best(media::Type::Audio).map(|s| s.index());
 
+        let duration = time::to_duration(input.duration(), time::AV_TIME_BASE);
+
         Ok(Self {
             input,
             read_state,
+            duration,
             video_stream_index,
             audio_stream_index,
             video_eof: false,
@@ -174,6 +179,11 @@ impl<R> MultimediaReader<R> {
             }
             None => Ok(None),
         }
+    }
+
+    #[inline]
+    pub fn duration(&self) -> Duration {
+        self.duration
     }
 }
 

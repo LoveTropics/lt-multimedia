@@ -1,9 +1,15 @@
 use ffmpeg_next as ffmpeg;
 use std::time::Duration;
 
+pub const AV_TIME_BASE: ffmpeg::Rational = ffmpeg::Rational(1, ffmpeg::ffi::AV_TIME_BASE as i32);
+
 #[inline]
 pub const fn to_duration(time: i64, time_base: ffmpeg::Rational) -> Duration {
-    Duration::from_micros((time * time_base.0 as i64 * 1000_000 / time_base.1 as i64) as u64)
+    if time_base.0 == 1 && time_base.1 == 1000_000 {
+        Duration::from_micros(time as u64)
+    } else {
+        Duration::from_micros((time * time_base.0 as i64 * 1000_000 / time_base.1 as i64) as u64)
+    }
 }
 
 pub fn frame_present_time(frame: &ffmpeg::Frame, time_base: ffmpeg::Rational) -> Duration {

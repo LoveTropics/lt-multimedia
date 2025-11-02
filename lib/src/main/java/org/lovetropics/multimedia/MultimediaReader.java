@@ -13,12 +13,14 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Path;
 import java.util.Objects;
 
-public class MultimediaReader implements Closeable {
+public final class MultimediaReader implements Closeable {
     private final long handle;
+    private final double duration;
     private boolean closed;
 
     private MultimediaReader(final long handle) {
         this.handle = handle;
+        duration = MultimediaNative.getDuration(handle);
     }
 
     public static boolean isSupportedPlatform() {
@@ -48,6 +50,10 @@ public class MultimediaReader implements Closeable {
         if (closed) {
             throw new IllegalStateException("Decoder has already been closed");
         }
+    }
+
+    public double duration() {
+        return duration;
     }
 
     public synchronized @Nullable MultimediaPacket readPacket() throws IOException {
