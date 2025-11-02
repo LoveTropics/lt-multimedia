@@ -141,10 +141,16 @@ public class MediaFileCache {
     }
 
     public CompletableFuture<Void> ensureDownloaded(final MediaFile file) {
+        if (file.isLocalFile()) {
+            return CompletableFuture.completedFuture(null);
+        }
         return getOrDownload(file.uri()).thenCompose(CachedFile::awaitDownload);
     }
 
     public SeekableByteChannel openChannel(final MediaFile file) throws IOException {
+        if (file.isLocalFile() && MediaFile.CAN_PLAY_FROM_LOCAL_FILE) {
+            return Files.newByteChannel(Path.of(file.uri()));
+        }
         final CachedFile cached;
         try {
             cached = getOrDownload(file.uri()).join();
