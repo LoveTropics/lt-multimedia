@@ -1,9 +1,10 @@
-use crate::{FrameDecoder, Frames, InnerPacket, Result};
+use crate::{time, FrameDecoder, Frames, InnerPacket, Result};
 use crossbeam_utils::atomic::AtomicCell;
 use ffmpeg::{codec, decoder, format, frame, software};
 use ffmpeg_next as ffmpeg;
 use std::iter;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct VideoFrameFormat {
@@ -61,8 +62,8 @@ pub struct VideoDecoder {
     resources: Arc<DecoderResources>,
     decoder: decoder::Video,
     format: VideoFrameFormat,
-    time_base: f64,
-    expected_frame_duration: f64,
+    time_base: ffmpeg::Rational,
+    expected_frame_duration: Duration,
 }
 
 impl VideoDecoder {
@@ -72,8 +73,8 @@ impl VideoDecoder {
             .video()?;
 
         let format = VideoFrameFormat::new(decoder.format(), decoder.width(), decoder.height());
-        let time_base = stream.time_base().into();
-        let expected_frame_duration = stream.rate().invert().into();
+        let time_base = stream.time_base();
+        let expected_frame_duration = time::to_duration(1, stream.rate().invert());
 
         Ok(VideoDecoder {
             resources: Default::default(),
@@ -93,14 +94,9 @@ impl VideoDecoder {
         let mut decoded_frame = self.resources.take_frame();
         match self.decoder.receive_frame(&mut decoded_frame) {
             Ok(_) => {
-                let present_time = decoded_frame
-                    .timestamp()
-                    .or(decoded_frame.pts())
-                    .unwrap_or(decoded_frame.packet().dts);
-                let present_duration = present_duration(&decoded_frame)
-                    .map(|duration| self.time_base * duration as f64)
+                let present_time = time::frame_present_time(&decoded_frame, self.time_base);
+                let present_duration = time::frame_present_duration(&decoded_frame, self.time_base)
                     .unwrap_or(self.expected_frame_duration);
-                let present_time = self.time_base * present_time as f64;
                 let present_end_time = present_time + present_duration;
                 let format = VideoFrameFormat::new(decoded_frame.format(), decoded_frame.width(), decoded_frame.height());
                 Some(Ok(VideoFrame {
@@ -137,14 +133,6 @@ impl FrameDecoder for VideoDecoder {
     }
 }
 
-fn present_duration(frame: &frame::Video) -> Option<i64> {
-    let present_duration = unsafe { (*frame.as_ptr()).duration };
-    match present_duration {
-        0 => None,
-        _ => Some(present_duration),
-    }
-}
-
 pub struct VideoFrames(VideoDecoder);
 
 impl Frames for VideoFrames {
@@ -172,18 +160,18 @@ pub struct VideoFrame {
     resources: Arc<DecoderResources>,
     frame: Option<frame::Video>,
     format: VideoFrameFormat,
-    present_time: f64,
-    present_end_time: f64,
+    present_time: Duration,
+    present_end_time: Duration,
 }
 
 impl VideoFrame {
     #[inline]
-    pub fn present_time(&self) -> f64 {
+    pub fn present_time(&self) -> Duration {
         self.present_time
     }
 
     #[inline]
-    pub fn present_end_time(&self) -> f64 {
+    pub fn present_end_time(&self) -> Duration {
         self.present_end_time
     }
 

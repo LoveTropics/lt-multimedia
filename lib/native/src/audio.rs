@@ -1,9 +1,10 @@
-use crate::{FrameDecoder, Frames, InnerPacket, Result};
+use crate::{time, FrameDecoder, Frames, InnerPacket, Result};
 use crossbeam_utils::atomic::AtomicCell;
 use ffmpeg::{codec, decoder, format, frame, software};
 use ffmpeg_next as ffmpeg;
 use std::iter;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct AudioFrameFormat {
@@ -57,7 +58,7 @@ pub struct AudioDecoder {
     decoder: decoder::Audio,
     resampler: software::resampling::Context,
     src_frame: frame::Audio,
-    dst_sample_to_time: f64,
+    dst_sample_duration: ffmpeg::Rational,
     current_samples: u64,
 }
 
@@ -84,7 +85,7 @@ impl AudioDecoder {
             decoder,
             resampler,
             src_frame: frame::Audio::empty(),
-            dst_sample_to_time: 1.0 / dst_format.sample_rate as f64,
+            dst_sample_duration: ffmpeg::Rational(1, dst_format.sample_rate as i32),
             current_samples: 0,
         })
     }
@@ -114,10 +115,10 @@ impl AudioDecoder {
         }
     }
 
-    fn handle_resample_result(&mut self, result: Result<Option<software::resampling::Delay>, ffmpeg::Error> , dst_frame: frame::Audio) -> Option<Result<AudioFrame>> {
+    fn handle_resample_result(&mut self, result: Result<Option<software::resampling::Delay>, ffmpeg::Error>, dst_frame: frame::Audio) -> Option<Result<AudioFrame>> {
         match result {
             Ok(_) => {
-                let present_time = self.current_samples as f64 * self.dst_sample_to_time;
+                let present_time = time::to_duration(self.current_samples as i64, self.dst_sample_duration);
                 self.current_samples += dst_frame.samples() as u64;
                 Some(Ok(AudioFrame {
                     resources: self.resources.clone(),
@@ -173,7 +174,7 @@ impl Frames for AudioFrames {
 pub struct AudioFrame {
     resources: Arc<DecoderResources>,
     frame: Option<frame::Audio>,
-    present_time: f64,
+    present_time: Duration,
 }
 
 impl AudioFrame {
@@ -182,7 +183,7 @@ impl AudioFrame {
     }
 
     #[inline]
-    pub fn present_time(&self) -> f64 {
+    pub fn present_time(&self) -> Duration {
         self.present_time
     }
 

@@ -1,5 +1,6 @@
 mod audio;
 mod java;
+pub(crate) mod time;
 mod video;
 
 use ffmpeg::{format, media};

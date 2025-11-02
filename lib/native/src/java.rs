@@ -225,7 +225,7 @@ pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_g
     frame: jlong,
 ) -> jdouble {
     let frame: &mut VideoFrame = unsafe { from_java_ptr(&env, frame) };
-    frame.present_time()
+    frame.present_time().as_secs_f64()
 }
 
 #[unsafe(no_mangle)]
@@ -236,7 +236,7 @@ pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_g
     frame: jlong,
 ) -> jdouble {
     let frame: &mut VideoFrame = unsafe { from_java_ptr(&env, frame) };
-    frame.present_end_time()
+    frame.present_end_time().as_secs_f64()
 }
 
 #[unsafe(no_mangle)]
@@ -346,7 +346,7 @@ pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_g
     frame: jlong,
 ) -> jdouble {
     let frame: &mut AudioFrame = unsafe { from_java_ptr(&env, frame) };
-    frame.present_time()
+    frame.present_time().as_secs_f64()
 }
 
 #[unsafe(no_mangle)]
