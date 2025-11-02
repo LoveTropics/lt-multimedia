@@ -1,10 +1,8 @@
 mod channel;
-mod input;
 
 use crate::*;
-use channel::JSeekableByteChannel;
+use channel::{JReadableByteChannel, JSeekableByteChannel};
 use ffmpeg_next::{format, ChannelLayout};
-use input::JInputStream;
 use jni::objects::{JByteBuffer, JClass, JObject, JString};
 use jni::sys::{jboolean, jdouble, jint, jlong};
 use jni::JNIEnv;
@@ -60,22 +58,26 @@ pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_o
 
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]
-pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_openInputStreamReader<'a>(
+pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_openByteChannelReader<'a>(
     mut env: JNIEnv<'a>,
     _class: JClass<'a>,
-    input: JObject<'a>,
+    channel: JObject<'a>,
 ) -> jlong {
-    let input = JInputStream::new(&mut env, input, 4096);
+    let input = match JReadableByteChannel::new(&mut env, channel) {
+        Ok(input) => input,
+        Err(jni::errors::Error::JavaException) => return 0,
+        Err(err) => panic!("Failed to wrap ReadableByteChannel: {}", err),
+    };
     handle_result(
         env,
-        MultimediaReader::open_stream(input).map(JMultimediaReader::Stream).map(into_java_ptr),
+        MultimediaReader::open_stream(input).map(JMultimediaReader::ReadableByteChannel).map(into_java_ptr),
         0
     )
 }
 
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]
-pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_openByteChannelReader<'a>(
+pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_openSeekableByteChannelReader<'a>(
     mut env: JNIEnv<'a>,
     _class: JClass<'a>,
     channel: JObject<'a>,
@@ -87,7 +89,7 @@ pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_o
     };
     handle_result(
         env,
-        MultimediaReader::open_seekable(input).map(JMultimediaReader::ByteChannel).map(into_java_ptr),
+        MultimediaReader::open_seekable(input).map(JMultimediaReader::SeekableByteChannel).map(into_java_ptr),
         0
     )
 }
@@ -427,16 +429,16 @@ unsafe fn as_slice_mut<'a>(env: &'a JNIEnv<'a>, buffer: &'a JByteBuffer) -> &'a 
 
 enum JMultimediaReader {
     Path(MultimediaReader<()>),
-    ByteChannel(MultimediaReader<JSeekableByteChannel>),
-    Stream(MultimediaReader<JInputStream>),
+    ReadableByteChannel(MultimediaReader<JReadableByteChannel>),
+    SeekableByteChannel(MultimediaReader<JSeekableByteChannel>),
 }
 
 macro_rules! forward_reader {
     ($self:ident, $reader:ident => $e:expr) => {
         match $self {
             JMultimediaReader::Path($reader) => $e,
-            JMultimediaReader::ByteChannel($reader) => $e,
-            JMultimediaReader::Stream($reader) => $e,
+            JMultimediaReader::ReadableByteChannel($reader) => $e,
+            JMultimediaReader::SeekableByteChannel($reader) => $e,
         }
     };
 }

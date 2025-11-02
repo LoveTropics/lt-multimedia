@@ -5,49 +5,31 @@ use jni::{JNIEnv, JavaVM};
 use std::io;
 use std::io::SeekFrom;
 
-pub struct JSeekableByteChannel {
+pub struct JReadableByteChannel {
     vm: JavaVM,
     object: GlobalRef,
     read_method: JMethodID,
-    set_position_method: JMethodID,
     close_method: JMethodID,
-    position: u64,
-    size: u64,
 }
 
-impl JSeekableByteChannel {
+impl JReadableByteChannel {
     pub fn new<'a>(env: &mut JNIEnv<'a>, object: JObject<'a>) -> Result<Self, jni::errors::Error> {
         let object = env.new_global_ref(object)?;
 
-        let class = env.find_class("java/nio/channels/SeekableByteChannel")?;
+        let class = env.find_class("java/nio/channels/ReadableByteChannel")?;
         let read_method = env.get_method_id(&class, "read", "(Ljava/nio/ByteBuffer;)I")?;
-        let set_position_method = env.get_method_id(
-            &class,
-            "position",
-            "(J)Ljava/nio/channels/SeekableByteChannel;",
-        )?;
         let close_method = env.get_method_id(&class, "close", "()V")?;
 
-        let position = env
-            .call_method(&object, "position", "()J", &[])
-            .map(|v| v.j().unwrap())? as u64;
-        let size = env
-            .call_method(&object, "size", "()J", &[])
-            .map(|v| v.j().unwrap())? as u64;
-
-        Ok(JSeekableByteChannel {
+        Ok(JReadableByteChannel {
             vm: env.get_java_vm()?,
             object,
             read_method,
-            set_position_method,
             close_method,
-            position,
-            size,
         })
     }
 }
 
-impl io::Read for JSeekableByteChannel {
+impl io::Read for JReadableByteChannel {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let mut env = self.vm.get_env().unwrap();
 
@@ -66,10 +48,7 @@ impl io::Read for JSeekableByteChannel {
         };
 
         match result {
-            Ok(read_bytes) if read_bytes >= 0 => {
-                self.position += read_bytes as u64;
-                Ok(read_bytes as usize)
-            }
+            Ok(read_bytes) if read_bytes >= 0 => Ok(read_bytes as usize),
             Ok(_) => Ok(0),
             Err(jni::errors::Error::JavaException) => {
                 Err(io::Error::other(jni::errors::Error::JavaException))
@@ -79,9 +58,76 @@ impl io::Read for JSeekableByteChannel {
     }
 }
 
+impl Drop for JReadableByteChannel {
+    fn drop(&mut self) {
+        let mut env = self
+            .vm
+            .get_env()
+            .expect("Cannot close ReadableByteChannel on this thread");
+        let result = unsafe {
+            env.call_method_unchecked(
+                &self.object,
+                self.close_method,
+                ReturnType::Primitive(Primitive::Void),
+                &[],
+            )
+        };
+        match result {
+            Ok(_) => (),
+            // The Java exception will be propagated already, no need to panic
+            Err(jni::errors::Error::JavaException) => (),
+            Err(err) => panic!("Unable to call ReadableByteChannel.close(): {}", err),
+        }
+    }
+}
+
+pub struct JSeekableByteChannel {
+    inner: JReadableByteChannel,
+    set_position_method: JMethodID,
+    position: u64,
+    size: u64,
+}
+
+impl JSeekableByteChannel {
+    pub fn new<'a>(env: &mut JNIEnv<'a>, object: JObject<'a>) -> Result<Self, jni::errors::Error> {
+        let inner = JReadableByteChannel::new(env, object)?;
+
+        let class = env.find_class("java/nio/channels/SeekableByteChannel")?;
+        let set_position_method = env.get_method_id(
+            &class,
+            "position",
+            "(J)Ljava/nio/channels/SeekableByteChannel;",
+        )?;
+
+        let position = env
+            .call_method(&inner.object, "position", "()J", &[])
+            .map(|v| v.j().unwrap())? as u64;
+        let size = env
+            .call_method(&inner.object, "size", "()J", &[])
+            .map(|v| v.j().unwrap())? as u64;
+
+        Ok(JSeekableByteChannel {
+            inner,
+            set_position_method,
+            position,
+            size,
+        })
+    }
+}
+
+impl io::Read for JSeekableByteChannel {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let result = self.inner.read(buf);
+        if let Ok(read_bytes) = result {
+            self.position += read_bytes as u64;
+        }
+        result
+    }
+}
+
 impl io::Seek for JSeekableByteChannel {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        let mut env = self.vm.get_env().unwrap();
+        let mut env = self.inner.vm.get_env().unwrap();
 
         let new_position = match pos {
             SeekFrom::Start(offset) => offset,
@@ -91,9 +137,14 @@ impl io::Seek for JSeekableByteChannel {
                 .map_err(|_| io::Error::other("Cannot seek before byte 0"))?,
         };
 
+        // SeekFrom::Current(0) is used to fetch the current position
+        if new_position == self.position {
+            return Ok(new_position);
+        }
+
         let result = unsafe {
             env.call_method_unchecked(
-                &self.object,
+                &self.inner.object,
                 self.set_position_method,
                 ReturnType::Object,
                 &[jvalue {
@@ -111,29 +162,6 @@ impl io::Seek for JSeekableByteChannel {
                 Err(io::Error::other(jni::errors::Error::JavaException))
             }
             Err(err) => panic!("Unable to call SeekableByteChannel.position(): {}", err),
-        }
-    }
-}
-
-impl Drop for JSeekableByteChannel {
-    fn drop(&mut self) {
-        let mut env = self
-            .vm
-            .get_env()
-            .expect("Cannot close SeekableByteChannel on this thread");
-        let result = unsafe {
-            env.call_method_unchecked(
-                &self.object,
-                self.close_method,
-                ReturnType::Primitive(Primitive::Void),
-                &[],
-            )
-        };
-        match result {
-            Ok(_) => (),
-            // The Java exception will be propagated already, no need to panic
-            Err(jni::errors::Error::JavaException) => (),
-            Err(err) => panic!("Unable to call SeekableByteChannel.close(): {}", err),
         }
     }
 }
