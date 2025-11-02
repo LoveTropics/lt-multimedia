@@ -50,6 +50,8 @@ import java.util.function.Consumer;
     @Nullable
     private AudioWorldSource worldSource;
 
+    private boolean seeking;
+
     private volatile boolean closed;
 
     private AudioPlaybackChannel(final int source, final SoundManager soundManager, final PacketReader packets, final AudioDecoder decoder, final PlaybackClock clock) {
@@ -121,6 +123,13 @@ import java.util.function.Consumer;
         setRelative(false);
     }
 
+    public void beginSeek() {
+        if (!seeking) {
+            reset();
+            seeking = true;
+        }
+    }
+
     private void reset() {
         // Bit of a hack - the source must not be in the AL_INITIAL state in order to unqueue its buffers
         if (AL10.alGetSourcei(source, AL10.AL_SOURCE_STATE) == AL10.AL_INITIAL) {
@@ -133,6 +142,15 @@ import java.util.function.Consumer;
         activeCorrection = null;
     }
 
+    public void endSeek() {
+        if (!seeking) {
+            throw new IllegalStateException("Not seeking");
+        }
+        seeking = false;
+        lastPlayedFrameEndTime = clock.getElapsedTime();
+        updateStream();
+    }
+
     // ChannelAccess will delete this channel if it ever reports being stopped - we might pause for a bit if we're
     // lagging behind, but we don't want to actually stop until the playback is over.
     @Override
@@ -142,7 +160,7 @@ import java.util.function.Consumer;
 
     @Override
     public void updateStream() {
-        if (closed) {
+        if (closed || seeking) {
             return;
         }
 
@@ -218,6 +236,10 @@ import java.util.function.Consumer;
 
     private void queueFrame(final AudioFrame frame, final double speedFactor) throws DecoderException {
         try (frame) {
+            if (frame.presentTime() < lastPlayedFrameEndTime) {
+                // Seeks are not precise, so we might have some frames to entirely skip
+                return;
+            }
             final double frameDuration = (double) frame.samples() / decoder.format().getSampleRate();
             final double frameEndTime = frame.presentTime() + frameDuration;
             final ByteBuffer buffer = sampler.sample(frame, Mth.floor(frame.samples() / speedFactor));
@@ -275,8 +297,8 @@ import java.util.function.Consumer;
             this.inner = inner;
         }
 
-        public void execute(final Consumer<AudioPlaybackChannel> consumer) {
-            inner.thenAcceptAsync(consumer, channelAccess.executor);
+        public CompletableFuture<Void> execute(final Consumer<AudioPlaybackChannel> consumer) {
+            return inner.thenAcceptAsync(consumer, channelAccess.executor);
         }
 
         @Override

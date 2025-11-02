@@ -36,6 +36,15 @@ public class PlaybackClock {
         }
     }
 
+    public synchronized void setElapsedTime(final double elapsedTime) {
+        final boolean wasPaused = isPaused();
+        final long currentTimestamp = Util.getNanos();
+        startedAt = (long) Math.floor(currentTimestamp - elapsedTime * SECONDS_TO_NANOS);
+        if (wasPaused) {
+            pausedAt = currentTimestamp;
+        }
+    }
+
     public synchronized void ensureInRange(final double frameStartTime, final double frameEndTime) {
         if (isPaused()) {
             return;

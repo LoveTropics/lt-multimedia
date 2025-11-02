@@ -30,6 +30,8 @@ public class VideoFrameUploader implements AutoCloseable {
     private final ReentrantLock writeFrameLock = new ReentrantLock();
     private final Condition canWrite = writeFrameLock.newCondition();
 
+    private boolean seeking;
+
     public VideoFrameUploader(final GpuDevice device, final FrameSize frameSize, final PlaybackClock clock) {
         this.device = device;
         requestedFrameSize = frameSize;
@@ -37,6 +39,38 @@ public class VideoFrameUploader implements AutoCloseable {
             frameBuffers[i] = new FrameBuffer(device, frameSize);
         }
         this.clock = clock;
+    }
+
+    public void beginSeek() {
+        writeFrameLock.lock();
+        try {
+            if (seeking) {
+                return;
+            }
+            seeking = true;
+            nextWriteIndex = 0;
+            nextReadIndex = 0;
+            for (final FrameBuffer buffer : frameBuffers) {
+                buffer.discardAndFreeze();
+            }
+        } finally {
+            writeFrameLock.unlock();
+        }
+    }
+
+    public void endSeek() {
+        writeFrameLock.lock();
+        try {
+            if (!seeking) {
+                throw new IllegalStateException("Not seeking");
+            }
+            seeking = false;
+            for (final FrameBuffer buffer : frameBuffers) {
+                buffer.unfreeze(device, requestedFrameSize);
+            }
+        } finally {
+            writeFrameLock.unlock();
+        }
     }
 
     public void tick() {
@@ -81,8 +115,14 @@ public class VideoFrameUploader implements AutoCloseable {
         }
         writeFrameLock.lock();
         try (frame) {
+            if (seeking) {
+                return;
+            }
             while (!frameBuffers[nextWriteIndex].tryWriteFrom(frame)) {
                 canWrite.await();
+                if (seeking) {
+                    return;
+                }
             }
             nextWriteIndex = (nextWriteIndex + 1) % frameBuffers.length;
         } finally {
@@ -153,6 +193,8 @@ public class VideoFrameUploader implements AutoCloseable {
             READY_TO_PRESENT,
             // Render Thread
             RECYCLING,
+            // Render Thread
+            FROZEN,
             // Render Thread
             CLOSED,
         }
@@ -266,6 +308,32 @@ public class VideoFrameUploader implements AutoCloseable {
             updateState(State.READY_TO_PRESENT, State.RECYCLING);
             // If we are able to immediately recycle this buffer, we may as well not wait
             tickRecycle(device, requestedFrameSize);
+        }
+
+        public void discardAndFreeze() {
+            final State state = this.state.get();
+            if (state == State.CLOSED) {
+                return;
+            } else if (state == State.WRITE_BEGIN) {
+                throw new IllegalStateException("Cannot discard while write is in progress");
+            }
+
+            updateState(state, State.FROZEN);
+
+            final GpuBuffer.MappedView mappedView = this.mappedView;
+            this.mappedView = null;
+            if (mappedView != null) {
+                mappedView.close();
+            }
+            if (recycleFence != null) {
+                recycleFence.awaitCompletion(Long.MAX_VALUE);
+                recycleFence = null;
+            }
+        }
+
+        public void unfreeze(final GpuDevice device, final FrameSize requestedFrameSize) {
+            updateState(State.FROZEN, State.READY_FOR_WRITE);
+            mapBuffer(device, requestedFrameSize);
         }
 
         @Override

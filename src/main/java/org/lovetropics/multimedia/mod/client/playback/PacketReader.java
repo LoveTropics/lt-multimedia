@@ -11,7 +11,9 @@ import org.slf4j.Logger;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.Objects;
 import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -30,6 +32,9 @@ import java.util.concurrent.locks.ReentrantLock;
     private final PacketQueue<VideoPacket> videoQueue = new PacketQueue<>(MAX_QUEUE_CAPACITY, PREFERRED_QUEUE_SIZE);
     private final PacketQueue<AudioPacket> audioQueue = new PacketQueue<>(MAX_QUEUE_CAPACITY, PREFERRED_QUEUE_SIZE);
 
+    @Nullable
+    private volatile SeekRequest seekRequest;
+
     private volatile boolean eof;
     private volatile boolean sleeping;
     private volatile boolean closed;
@@ -45,6 +50,24 @@ import java.util.concurrent.locks.ReentrantLock;
 
     public void discardAudio() {
         audioQueue.discard();
+    }
+
+    public CompletableFuture<Void> seekUpTo(final double time) {
+        lock.lock();
+        try {
+            final SeekRequest oldRequest = seekRequest;
+            final CompletableFuture<Void> future = oldRequest != null ? oldRequest.future : new CompletableFuture<>();
+            seekRequest = new SeekRequest(time, future);
+            videoQueue.clear();
+            audioQueue.clear();
+            eof = false;
+            if (sleeping) {
+                wakeUp.signal();
+            }
+            return future;
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Nullable
@@ -64,6 +87,7 @@ import java.util.concurrent.locks.ReentrantLock;
     private void run() {
         try {
             while (!closed) {
+                handleSeekRequest();
                 final MultimediaPacket packet = reader.readPacket();
                 if (packet != null) {
                     enqueueAndSleep(packet);
@@ -102,6 +126,11 @@ import java.util.concurrent.locks.ReentrantLock;
         }
         lock.lock();
         try {
+            if (seekRequest != null) {
+                // Seek was requested since we started decoding, this packet is no longer relevant
+                packet.close();
+                return;
+            }
             if (queue.enqueue(packet) && shouldSleep()) {
                 sleeping = true;
                 wakeUp.await();
@@ -136,6 +165,26 @@ import java.util.concurrent.locks.ReentrantLock;
             return false;
         } else {
             return !(videoQueue.canAcceptPacket() && audioQueue.canAcceptPacket());
+        }
+    }
+
+    private void handleSeekRequest() throws IOException {
+        if (seekRequest == null) {
+            return;
+        }
+        lock.lock();
+        try {
+            // Will never be null, can only be cleared by this thread
+            final SeekRequest request = Objects.requireNonNull(seekRequest);
+            seekRequest = null;
+            try {
+                reader.seekUpTo(request.time);
+                request.future.complete(null);
+            } catch (final IOException e) {
+                request.future.completeExceptionally(e);
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -251,5 +300,17 @@ import java.util.concurrent.locks.ReentrantLock;
                 lock.unlock();
             }
         }
+
+        public void clear() {
+            lock.lock();
+            try {
+                queue.clear();
+            } finally {
+                lock.unlock();
+            }
+        }
+    }
+
+    private record SeekRequest(double time, CompletableFuture<Void> future) {
     }
 }
