@@ -13,6 +13,8 @@ import org.lovetropics.multimedia.mod.client.GpuExtensions;
 import javax.annotation.Nullable;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class VideoFrameUploader implements AutoCloseable {
     private static final int BUFFER_COUNT = 3;
@@ -25,6 +27,9 @@ public class VideoFrameUploader implements AutoCloseable {
     private int nextWriteIndex;
     private int nextReadIndex;
 
+    private final ReentrantLock writeFrameLock = new ReentrantLock();
+    private final Condition canWrite = writeFrameLock.newCondition();
+
     public VideoFrameUploader(final GpuDevice device, final FrameSize frameSize, final PlaybackClock clock) {
         this.device = device;
         requestedFrameSize = frameSize;
@@ -35,10 +40,21 @@ public class VideoFrameUploader implements AutoCloseable {
     }
 
     public void tick() {
+        boolean readyForWrite = false;
         for (final FrameBuffer buffer : frameBuffers) {
             buffer.tick(device, requestedFrameSize);
+            readyForWrite |= buffer.isReadyForWrite();
         }
         discardExpiredFrames();
+
+        if (readyForWrite) {
+            writeFrameLock.lock();
+            try {
+                canWrite.signal();
+            } finally {
+                writeFrameLock.unlock();
+            }
+        }
     }
 
     // If we stop rendering (for example the playback goes off-screen), we don't want to stall it due to frames not being consumed
@@ -63,10 +79,14 @@ public class VideoFrameUploader implements AutoCloseable {
             frame.close();
             return;
         }
+        writeFrameLock.lock();
         try (frame) {
-            final FrameBuffer buffer = frameBuffers[nextWriteIndex];
+            while (!frameBuffers[nextWriteIndex].tryWriteFrom(frame)) {
+                canWrite.await();
+            }
             nextWriteIndex = (nextWriteIndex + 1) % frameBuffers.length;
-            buffer.writeFrom(frame);
+        } finally {
+            writeFrameLock.unlock();
         }
     }
 
@@ -145,7 +165,6 @@ public class VideoFrameUploader implements AutoCloseable {
         private volatile double presentTime;
 
         private final AtomicReference<State> state = new AtomicReference<>(State.READY_FOR_WRITE);
-        private final Object writeReadyLock = new Object();
 
         @Nullable
         private GpuFence recycleFence;
@@ -211,23 +230,23 @@ public class VideoFrameUploader implements AutoCloseable {
                 }
                 // Texture copy has completed, we can safely map the buffer and start writing into it again
                 mapBuffer(device, requestedFrameSize);
-                synchronized (writeReadyLock) {
-                    updateState(State.RECYCLING, State.READY_FOR_WRITE);
-                    writeReadyLock.notify();
-                }
+                updateState(State.RECYCLING, State.READY_FOR_WRITE);
             }
         }
 
-        public void writeFrom(final VideoFrame frame) throws DecoderException, InterruptedException {
-            synchronized (writeReadyLock) {
-                while (!tryUpdateState(State.READY_FOR_WRITE, State.WRITE_BEGIN)) {
-                    writeReadyLock.wait();
-                }
+        public boolean tryWriteFrom(final VideoFrame frame) throws DecoderException {
+            if (!tryUpdateState(State.READY_FOR_WRITE, State.WRITE_BEGIN)) {
+                return false;
             }
             final GpuBuffer.MappedView mappedView = Objects.requireNonNull(this.mappedView);
             presentTime = frame.presentTime();
             frame.unpackPixels(frameSize.width(), frameSize.height(), mappedView.data());
             updateState(State.WRITE_BEGIN, State.WRITE_END);
+            return true;
+        }
+
+        public boolean isReadyForWrite() {
+            return state.get() == State.READY_FOR_WRITE;
         }
 
         public boolean isReadyToPresent() {
