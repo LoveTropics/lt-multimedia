@@ -236,10 +236,6 @@ import java.util.function.Consumer;
 
     private void queueFrame(final AudioFrame frame, final double speedFactor) throws DecoderException {
         try (frame) {
-            if (frame.presentTime() < lastPlayedFrameEndTime) {
-                // Seeks are not precise, so we might have some frames to entirely skip
-                return;
-            }
             final double frameDuration = (double) frame.samples() / decoder.format().getSampleRate();
             final double frameEndTime = frame.presentTime() + frameDuration;
             final ByteBuffer buffer = sampler.sample(frame, Mth.floor(frame.samples() / speedFactor));

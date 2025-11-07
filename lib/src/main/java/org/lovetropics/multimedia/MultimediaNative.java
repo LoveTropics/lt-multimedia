@@ -44,7 +44,7 @@ public class MultimediaNative {
 
     public static native int getPacketType(long packet);
 
-    public static native void seekUpTo(long reader, double time) throws IOException;
+    public static native void seekTo(long reader, double time) throws IOException;
 
     public static native long openVideoDecoder(long reader) throws IOException, DecoderException;
 

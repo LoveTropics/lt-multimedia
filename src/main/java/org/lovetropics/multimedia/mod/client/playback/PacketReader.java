@@ -52,7 +52,7 @@ import java.util.concurrent.locks.ReentrantLock;
         audioQueue.discard();
     }
 
-    public CompletableFuture<Void> seekUpTo(final double time) {
+    public CompletableFuture<Void> seekTo(final double time) {
         lock.lock();
         try {
             final SeekRequest oldRequest = seekRequest;
@@ -178,7 +178,7 @@ import java.util.concurrent.locks.ReentrantLock;
             final SeekRequest request = Objects.requireNonNull(seekRequest);
             seekRequest = null;
             try {
-                reader.seekUpTo(request.time);
+                reader.seekTo(request.time);
                 request.future.complete(null);
             } catch (final IOException e) {
                 request.future.completeExceptionally(e);

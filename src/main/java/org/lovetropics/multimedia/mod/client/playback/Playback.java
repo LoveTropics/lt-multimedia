@@ -162,14 +162,14 @@ public class Playback implements AutoCloseable {
         }
     }
 
-    public void seekUpTo(final double time) {
+    public void seekTo(final double time) {
         if (time < 0.0 || time > sourceDuration) {
             throw new IllegalArgumentException("Time must be between 0 and " + sourceDuration + " seconds");
         }
-        scheduleControl(() -> seekUpToInternal(time));
+        scheduleControl(() -> seekToInternal(time));
     }
 
-    private CompletableFuture<?> seekUpToInternal(final double time) {
+    private CompletableFuture<?> seekToInternal(final double time) {
         if (clock.getElapsedTime() == time) {
             return CompletableFuture.completedFuture(null);
         }
@@ -184,7 +184,7 @@ public class Playback implements AutoCloseable {
             future = audioPlayback.execute(AudioPlaybackChannel::beginSeek);
         }
 
-        future = future.thenCompose(ignored -> packetReader.seekUpTo(time));
+        future = future.thenCompose(ignored -> packetReader.seekTo(time));
         future = future.thenRunAsync(() -> {
             clock.setElapsedTime(time);
             if (!wasPaused) {

@@ -1,4 +1,4 @@
-use crate::{time, FrameDecoder, Frames, InnerPacket, Result};
+use crate::{time, FlushRequest, FrameDecoder, Frames, InnerPacket, Result};
 use crossbeam_utils::atomic::AtomicCell;
 use ffmpeg::{codec, decoder, format, frame, software};
 use ffmpeg_next as ffmpeg;
@@ -49,7 +49,7 @@ impl VideoFrameFormat {
 pub struct VideoPacket(pub(super) InnerPacket);
 
 impl VideoPacket {
-    pub(super) fn new(packet: ffmpeg::Packet, flush: bool) -> Self {
+    pub(super) fn new(packet: ffmpeg::Packet, flush: Option<FlushRequest>) -> Self {
         VideoPacket(InnerPacket::Packet { packet, flush })
     }
 
@@ -64,6 +64,7 @@ pub struct VideoDecoder {
     format: VideoFrameFormat,
     time_base: ffmpeg::Rational,
     expected_frame_duration: Duration,
+    discard_up_to: Duration,
 }
 
 impl VideoDecoder {
@@ -82,6 +83,7 @@ impl VideoDecoder {
             format,
             time_base,
             expected_frame_duration,
+            discard_up_to: Duration::ZERO,
         })
     }
 
@@ -92,30 +94,35 @@ impl VideoDecoder {
 
     fn receive_frame(&mut self) -> Option<Result<VideoFrame>> {
         let mut decoded_frame = self.resources.take_frame();
-        match self.decoder.receive_frame(&mut decoded_frame) {
-            Ok(_) => {
-                let present_time = time::frame_present_time(&decoded_frame, self.time_base);
-                let present_duration = time::frame_present_duration(&decoded_frame, self.time_base)
-                    .unwrap_or(self.expected_frame_duration);
-                let present_end_time = present_time + present_duration;
-                let format = VideoFrameFormat::new(decoded_frame.format(), decoded_frame.width(), decoded_frame.height());
-                Some(Ok(VideoFrame {
-                    resources: self.resources.clone(),
-                    frame: Some(decoded_frame),
-                    format,
-                    present_time,
-                    present_end_time,
-                }))
-            }
-            Err(err) => {
-                self.resources.release_frame(decoded_frame);
-                match err {
-                    ffmpeg::Error::Other { errno: ffmpeg::error::EAGAIN } => None,
-                    ffmpeg::Error::Eof => None,
-                    _ => Some(Err(err.into())),
-                }
-            }
-        }
+        loop {
+           match self.decoder.receive_frame(&mut decoded_frame) {
+               Ok(_) => {
+                   let present_time = time::frame_present_time(&decoded_frame, self.time_base);
+                   if present_time < self.discard_up_to {
+                       continue;
+                   }
+                   let present_duration = time::frame_present_duration(&decoded_frame, self.time_base)
+                       .unwrap_or(self.expected_frame_duration);
+                   let present_end_time = present_time + present_duration;
+                   let format = VideoFrameFormat::new(decoded_frame.format(), decoded_frame.width(), decoded_frame.height());
+                   break Some(Ok(VideoFrame {
+                       resources: self.resources.clone(),
+                       frame: Some(decoded_frame),
+                       format,
+                       present_time,
+                       present_end_time,
+                   }))
+               }
+               Err(err) => {
+                   self.resources.release_frame(decoded_frame);
+                   break match err {
+                       ffmpeg::Error::Other { errno: ffmpeg::error::EAGAIN } => None,
+                       ffmpeg::Error::Eof => None,
+                       _ => Some(Err(err.into())),
+                   }
+               }
+           }
+       }
     }
 }
 

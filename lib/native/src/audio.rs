@@ -1,4 +1,4 @@
-use crate::{time, FrameDecoder, Frames, InnerPacket, Result};
+use crate::{time, FlushRequest, FrameDecoder, Frames, InnerPacket, Result};
 use crossbeam_utils::atomic::AtomicCell;
 use ffmpeg::{codec, decoder, format, frame, software};
 use ffmpeg_next as ffmpeg;
@@ -42,7 +42,7 @@ impl AudioFrameFormat {
 pub struct AudioPacket(pub(super) InnerPacket);
 
 impl AudioPacket {
-    pub(super) fn new(packet: ffmpeg::Packet, flush: bool) -> Self {
+    pub(super) fn new(packet: ffmpeg::Packet, flush: Option<FlushRequest>) -> Self {
         AudioPacket(InnerPacket::Packet { packet, flush })
     }
 
@@ -61,6 +61,7 @@ pub struct AudioDecoder {
     src_time_base: ffmpeg::Rational,
     dst_sample_duration: ffmpeg::Rational,
 
+    discard_up_to: Duration,
     dst_base_timestamp: Option<Duration>,
     current_dst_samples: u64,
 }
@@ -84,6 +85,7 @@ impl AudioDecoder {
             src_frame: frame::Audio::empty(),
             src_time_base,
             dst_sample_duration: ffmpeg::Rational(1, dst_format.sample_rate as i32),
+            discard_up_to: Duration::ZERO,
             dst_base_timestamp: None,
             current_dst_samples: 0,
         })
@@ -109,20 +111,26 @@ impl AudioDecoder {
             return self.handle_resample_result(result, dst_frame);
         }
 
-        match self.decoder.receive_frame(&mut self.src_frame) {
-            Ok(_) => {
-                if self.dst_base_timestamp.is_none() {
-                    self.dst_base_timestamp = Some(time::frame_present_time(&self.src_frame, self.src_time_base));
+        loop {
+            match self.decoder.receive_frame(&mut self.src_frame) {
+                Ok(_) => {
+                    let present_time = time::frame_present_time(&self.src_frame, self.src_time_base);
+                    if present_time < self.discard_up_to {
+                        continue;
+                    }
+                    if self.dst_base_timestamp.is_none() {
+                        self.dst_base_timestamp = Some(present_time);
+                    }
+                    let result = self.resampler.run(&self.src_frame, &mut dst_frame);
+                    break self.handle_resample_result(result, dst_frame)
                 }
-                let result = self.resampler.run(&self.src_frame, &mut dst_frame);
-                self.handle_resample_result(result, dst_frame)
-            }
-            Err(err) => {
-                self.resources.release_frame(dst_frame);
-                match err {
-                    ffmpeg::Error::Other { errno: ffmpeg::error::EAGAIN } => None,
-                    ffmpeg::Error::Eof => None,
-                    _ => Some(Err(err.into())),
+                Err(err) => {
+                    self.resources.release_frame(dst_frame);
+                    break match err {
+                        ffmpeg::Error::Other { errno: ffmpeg::error::EAGAIN } => None,
+                        ffmpeg::Error::Eof => None,
+                        _ => Some(Err(err.into())),
+                    }
                 }
             }
         }
@@ -155,9 +163,10 @@ impl FrameDecoder for AudioDecoder {
     #[inline]
     fn send_packet(mut self, packet: AudioPacket) -> Result<AudioFrames> {
         match packet.0.send_to(&mut self.decoder) {
-            Ok(flushed) => {
-                if flushed {
+            Ok(flush) => {
+                if let Some(flush) = flush {
                     self.resampler = Self::create_resampler(&self.decoder, self.resources.format);
+                    self.discard_up_to = flush.discard_up_to;
                     self.dst_base_timestamp = None;
                     self.current_dst_samples = 0;
                 }

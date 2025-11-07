@@ -113,7 +113,7 @@ public class SlideshowDriver implements AutoCloseable {
                 yield CompletableFuture.supplyAsync(() -> {
                     try {
                         final Playback playback = Playback.open(channel, windowSize, syncType);
-                        playback.seekUpTo(video.startAt().toMillis() / 1000.0);
+                        playback.seekTo(video.startAt().toMillis() / 1000.0);
                         return new PreparedSlideContent.Video(playback, video.volume());
                     } catch (final IOException | DecoderException e) {
                         IOUtils.closeQuietly(channel);
