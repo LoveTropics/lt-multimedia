@@ -3,18 +3,16 @@ package org.lovetropics.multimedia.mod.client.slideshow;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.ARGB;
+import net.minecraft.util.Mth;
 import org.lovetropics.multimedia.mod.client.playback.AudioWorldSource;
 import org.lovetropics.multimedia.mod.client.playback.FrameSize;
 import org.lovetropics.multimedia.mod.client.playback.Playback;
 import org.lovetropics.multimedia.mod.client.playback.VideoFrameTexture;
 
-import java.time.Duration;
-import java.time.Instant;
+public interface PreparedSlide extends AutoCloseable {
+    void startOrSync(double time, boolean paused);
 
-public interface PreparedSlideContent extends AutoCloseable {
-    boolean isReadyToSwapOut();
-
-    void start();
+    double getPlaybackTime();
 
     void draw(SlideshowGraphics graphics, float alpha);
 
@@ -26,15 +24,19 @@ public interface PreparedSlideContent extends AutoCloseable {
     default void setAudioSource(final AudioWorldSource source) {
     }
 
-    record Video(Playback playback, float volume) implements PreparedSlideContent {
+    record Video(Playback playback, double startAt, float volume) implements PreparedSlide {
         @Override
-        public boolean isReadyToSwapOut() {
-            return playback.currentTime() >= playback.duration();
+        public void startOrSync(final double time, final boolean paused) {
+            playback.pause();
+            playback.seekTo(Mth.clamp(time + startAt, 0.0, playback.duration()));
+            if (!paused) {
+                playback.play();
+            }
         }
 
         @Override
-        public void start() {
-            playback.play();
+        public double getPlaybackTime() {
+            return playback.currentTime() - startAt;
         }
 
         @Override
@@ -68,24 +70,14 @@ public interface PreparedSlideContent extends AutoCloseable {
         }
     }
 
-    class Text implements PreparedSlideContent {
-        private final Component text;
-        private final Duration duration;
-        private Instant swapAfter = Instant.MAX;
-
-        public Text(final Component text, final Duration duration) {
-            this.text = text;
-            this.duration = duration;
+    record Text(Component text) implements PreparedSlide {
+        @Override
+        public void startOrSync(final double time, final boolean paused) {
         }
 
         @Override
-        public boolean isReadyToSwapOut() {
-            return Instant.now().isAfter(swapAfter);
-        }
-
-        @Override
-        public void start() {
-            swapAfter = Instant.now().plus(duration);
+        public double getPlaybackTime() {
+            return Double.NaN;
         }
 
         @Override

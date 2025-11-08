@@ -1,64 +1,36 @@
 package org.lovetropics.multimedia.mod.client.slideshow;
 
-import com.mojang.blaze3d.platform.Window;
-import com.mojang.logging.LogUtils;
-import net.minecraft.ChatFormatting;
-import net.minecraft.SharedConstants;
-import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
-import org.apache.commons.io.IOUtils;
-import org.lovetropics.multimedia.DecoderException;
 import org.lovetropics.multimedia.mod.client.cache.MediaFileCache;
 import org.lovetropics.multimedia.mod.client.playback.AudioWorldSource;
-import org.lovetropics.multimedia.mod.client.playback.FrameSize;
-import org.lovetropics.multimedia.mod.client.playback.Playback;
+import org.lovetropics.multimedia.mod.client.playback.PlaybackClock;
 import org.lovetropics.multimedia.mod.client.playback.PlaybackSyncType;
-import org.lovetropics.multimedia.mod.slideshow.Slide;
-import org.lovetropics.multimedia.mod.slideshow.SlideContent;
-import org.lovetropics.multimedia.mod.slideshow.SlideTransition;
 import org.lovetropics.multimedia.mod.slideshow.Slideshow;
-import org.slf4j.Logger;
 
 import javax.annotation.Nullable;
-import java.io.IOException;
-import java.nio.channels.SeekableByteChannel;
-import java.time.Duration;
-import java.util.ArrayDeque;
-import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
+import java.util.function.Consumer;
 
 public class SlideshowDriver implements AutoCloseable {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final double PREPARE_TIME_MARGIN = 5.0;
 
-    private static final PreparedSlideContent.Text ERROR_CONTENT = new PreparedSlideContent.Text(
-            Component.translatable("slideshow.slide.error").withStyle(ChatFormatting.RED),
-            Duration.ofSeconds(5)
-        );
-
-    private final MediaFileCache mediaCache;
     private final Slideshow slideshow;
     private final PlaybackSyncType syncType;
+
+    private final SlideQueue slideQueue;
+    private final PlaybackClock clock = new PlaybackClock();
 
     private float audioVolume = 1.0f;
     @Nullable
     private AudioWorldSource audioSource;
 
     @Nullable
-    private PreparedSlide currentSlide;
-    @Nullable
-    private PreparedSlide nextSlide;
-    private final Queue<Slide> slideQueue = new ArrayDeque<>();
-
-    private float lastFade;
-    private float fade;
+    private State state;
 
     public SlideshowDriver(final MediaFileCache mediaCache, final Slideshow slideshow, final PlaybackSyncType syncType) {
-        this.mediaCache = mediaCache;
         this.slideshow = slideshow;
-        slideQueue.addAll(slideshow.slides());
+        slideQueue = SlideQueue.load(mediaCache, slideshow);
         this.syncType = syncType;
     }
 
@@ -67,8 +39,8 @@ public class SlideshowDriver implements AutoCloseable {
             return;
         }
         audioVolume = volume;
-        if (currentSlide != null) {
-            currentSlide.setAudioVolume(volume);
+        if (state != null) {
+            state.updateAudio();
         }
     }
 
@@ -77,138 +49,89 @@ public class SlideshowDriver implements AutoCloseable {
             return;
         }
         audioSource = source;
-        if (currentSlide != null) {
-            currentSlide.setAudioSource(audioSource);
+        if (state != null) {
+            state.updateAudio();
         }
     }
 
-    @Nullable
-    private PreparedSlide prepareNextSlide(final Slideshow slideshow, @Nullable final PreparedSlide currentSlide) {
-        final Slide slide = slideQueue.poll();
-        if (slide != null) {
-            return prepareSlide(slideshow, currentSlide, slide);
+    private Slide prepareSlide(final int index) {
+        if (index < 0) {
+            return new Slide(index, null, 0.0, 0.0, 0.0);
+        } else if (index >= slideQueue.size()) {
+            final double startTime = slideQueue.getSlideStartTime(index);
+            final double transitionIn = slideQueue.getTransitionIn(index);
+            return new Slide(index, null, startTime, startTime, transitionIn);
         }
-        return null;
-    }
-
-    private PreparedSlide prepareSlide(final Slideshow slideshow, @Nullable final PreparedSlide previousSlide, final Slide slide) {
-        final Window window = Minecraft.getInstance().getWindow();
-        final FrameSize windowSize = FrameSize.from(window);
-
-        final SlideTransition previousTransitionOut = previousSlide != null ? previousSlide.transitionOut : slideshow.defaultTransition();
-        final SlideTransition transitionIn = slide.transitionIn().orElse(previousTransitionOut);
-        final SlideTransition transitionOut = slide.transitionOut().orElse(slideshow.defaultTransition());
-
-        final CompletableFuture<PreparedSlideContent> contentFuture = CompletableFuture.supplyAsync(
-                () -> prepareSlideContent(mediaCache, slide.content(), windowSize, syncType),
-                Util.nonCriticalIoPool()
-        ).thenCompose(Function.identity());
-        return new PreparedSlide(contentFuture.exceptionally(throwable -> {
-            LOGGER.error("An unexpected error occurred while preparing slide", throwable);
-            return ERROR_CONTENT;
-        }), transitionIn, transitionOut);
-    }
-
-    private static CompletableFuture<PreparedSlideContent> prepareSlideContent(final MediaFileCache mediaCache, final SlideContent slide, final FrameSize windowSize, final PlaybackSyncType syncType) {
-        return switch (slide) {
-            case final SlideContent.Video video -> {
-                final SeekableByteChannel channel;
-                try {
-                    channel = mediaCache.openChannel(video.file());
-                } catch (final IOException e) {
-                    LOGGER.error("Failed to load video slide", e);
-                    yield CompletableFuture.completedFuture(ERROR_CONTENT);
-                }
-                yield CompletableFuture.supplyAsync(() -> {
-                    try {
-                        final Playback playback = Playback.open(channel, windowSize, syncType);
-                        playback.seekTo(video.startAt().toMillis() / 1000.0);
-                        return new PreparedSlideContent.Video(playback, video.volume());
-                    } catch (final IOException | DecoderException e) {
-                        IOUtils.closeQuietly(channel);
-                        LOGGER.error("Failed to load video slide", e);
-                        return ERROR_CONTENT;
-                    }
-                }, Minecraft.getInstance());
-            }
-            case final SlideContent.Text text ->
-                    CompletableFuture.completedFuture(new PreparedSlideContent.Text(text.text(), text.duration()));
-        };
-    }
-
-    public void clear() {
-        slideQueue.clear();
-        if (currentSlide != null) {
-            currentSlide.forceSwapOut();
-        }
-        nextSlide = null;
-    }
-
-    public boolean tick() {
-        if (nextSlide == null) {
-            nextSlide = prepareNextSlide(slideshow, currentSlide);
-        }
-
-        if (currentSlide == null && nextSlide == null) {
-            return true;
-        }
-
-        if ((currentSlide == null || currentSlide.isReadyToSwapOut()) && (nextSlide == null || nextSlide.isReadyToSwapIn())) {
-            final SlideTransition transition = nextSlide != null ? nextSlide.transitionIn : currentSlide.transitionOut;
-            lastFade = fade;
-            fade += SharedConstants.MILLIS_PER_TICK / (float) transition.duration().toMillis();
-            if (fade >= 1.0f) {
-                swapSlides();
-            }
-        }
-
-        return false;
-    }
-
-    private void swapSlides() {
-        lastFade = 0.0f;
-        fade = 0.0f;
-        if (currentSlide != null) {
-            currentSlide.close();
-        }
-        if (nextSlide != null) {
-            setupSlideAudio(nextSlide);
-            nextSlide.start();
-        }
-        currentSlide = nextSlide;
-        nextSlide = prepareNextSlide(slideshow, currentSlide);
-    }
-
-    private void setupSlideAudio(final PreparedSlide slide) {
+        final Slide slide = new Slide(
+                index,
+                slideQueue.prepareSlide(index, syncType),
+                slideQueue.getSlideStartTime(index),
+                slideQueue.getSlideEndTime(index),
+                slideQueue.getTransitionIn(index)
+        );
         slide.setAudioVolume(audioVolume);
         if (audioSource != null) {
             slide.setAudioSource(audioSource);
+        }
+        return slide;
+    }
+
+    @Nullable
+    private State startPlaying(final Slide slide) {
+        if (slide.isEmpty()) {
+            return null;
+        }
+        slide.setAudioVolume(audioVolume);
+        slide.startOrSync(clock);
+        return new Playing(slide);
+    }
+
+    @Nullable
+    private State startFading(final Slide fromSlide, final Slide toSlide) {
+        if (fromSlide.isEmpty() && toSlide.isEmpty()) {
+            return null;
+        }
+        fromSlide.startOrSync(clock);
+        toSlide.setAudioVolume(0.0f);
+        toSlide.startOrSync(clock);
+        return new Fading(fromSlide, toSlide);
+    }
+
+    public boolean tick() {
+        if (state != null) {
+            syncToPlayback();
+            state = state.tick();
+        }
+        return state == null;
+    }
+
+    private void syncToPlayback() {
+        if (state == null || syncType != PlaybackSyncType.PLAYBACK) {
+            return;
+        }
+        final double playbackTime = state.getPlaybackTime();
+        if (!Double.isNaN(playbackTime)) {
+            clock.setElapsedTime(playbackTime);
         }
     }
 
     @Nullable
     public SlideshowRenderState extractRenderState(final float partialTicks) {
-        final PreparedSlideContent currentSlide = this.currentSlide != null ? this.currentSlide.getContentNow() : null;
-        final PreparedSlideContent nextSlide = this.nextSlide != null ? this.nextSlide.getContentNow() : null;
-        if (currentSlide == null && nextSlide == null) {
-            return null;
+        if (state != null) {
+            return state.extractRenderState(partialTicks);
         }
-        return new SlideshowRenderState(currentSlide, nextSlide, Mth.lerp(partialTicks, lastFade, fade));
+        return null;
     }
 
     public boolean hasFadedIn() {
-        return currentSlide != null;
+        return state != null && state.hasFadedIn();
     }
 
     @Override
     public void close() {
-        if (currentSlide != null) {
-            currentSlide.close();
-            currentSlide = null;
-        }
-        if (nextSlide != null) {
-            nextSlide.close();
-            nextSlide = null;
+        if (state != null) {
+            state.close();
+            state = null;
         }
     }
 
@@ -216,53 +139,209 @@ public class SlideshowDriver implements AutoCloseable {
         return slideshow;
     }
 
-    private static class PreparedSlide {
-        private final CompletableFuture<PreparedSlideContent> content;
-        private final SlideTransition transitionIn;
-        private final SlideTransition transitionOut;
-        private boolean forceSwapOut;
+    private interface State extends AutoCloseable {
+        @Nullable
+        State tick();
 
-        private PreparedSlide(final CompletableFuture<PreparedSlideContent> content, final SlideTransition transitionIn, final SlideTransition transitionOut) {
-            this.content = content;
-            this.transitionIn = transitionIn;
-            this.transitionOut = transitionOut;
+        void updateAudio();
+
+        boolean hasFadedIn();
+
+        double getPlaybackTime();
+
+        @Nullable
+        SlideshowRenderState extractRenderState(float partialTicks);
+
+        @Override
+        void close();
+    }
+
+    private class Playing implements State {
+        private final Slide slide;
+        @Nullable
+        private Slide nextSlide;
+
+        private Playing(final Slide slide) {
+            this.slide = slide;
         }
 
-        public void forceSwapOut() {
-            forceSwapOut = true;
-        }
-
-        public boolean isReadyToSwapIn() {
-            return content.isDone();
-        }
-
-        public boolean isReadyToSwapOut() {
-            if (forceSwapOut) {
-                return true;
+        @Override
+        @Nullable
+        public State tick() {
+            final double remainingTime = slide.endTime() - clock.getElapsedTime();
+            if (nextSlide == null && remainingTime < PREPARE_TIME_MARGIN) {
+                nextSlide = prepareSlide(slide.index() + 1);
             }
-            final PreparedSlideContent content = getContentNow();
-            return content != null && content.isReadyToSwapOut();
+            if (remainingTime <= 0.0) {
+                return startFading(slide, nextSlide);
+            }
+            return this;
         }
 
-        public void setAudioVolume(final float volume) {
-            content.join().setAudioVolume(volume);
+        @Override
+        public void updateAudio() {
+            slide.setAudioVolume(audioVolume);
+            if (nextSlide != null) {
+                nextSlide.setAudioVolume(audioVolume);
+            }
+            if (audioSource != null) {
+                slide.setAudioSource(audioSource);
+                if (nextSlide != null) {
+                    nextSlide.setAudioSource(audioSource);
+                }
+            }
         }
 
-        public void setAudioSource(final AudioWorldSource source) {
-            content.join().setAudioSource(source);
+        @Override
+        public boolean hasFadedIn() {
+            return true;
         }
 
-        public void start() {
-            content.join().start();
+        @Override
+        public double getPlaybackTime() {
+            return slide.getPlaybackTime();
         }
 
+        @Override
+        @Nullable
+        public SlideshowRenderState extractRenderState(final float partialTicks) {
+            return new SlideshowRenderState(slide.getNow(), null, 0.0f);
+        }
+
+        @Override
         public void close() {
-            content.join().close();
+            slide.close();
+            if (nextSlide != null) {
+                nextSlide.close();
+            }
+        }
+    }
+
+    private class Fading implements State {
+        private final Slide fromSlide;
+        private final Slide toSlide;
+
+        private float lastFade;
+        private float fade;
+
+        private Fading(final Slide fromSlide, final Slide toSlide) {
+            this.fromSlide = fromSlide;
+            this.toSlide = toSlide;
+        }
+
+        @Override
+        @Nullable
+        public State tick() {
+            final double elapsedTime = clock.getElapsedTime();
+            final double fromTime = toSlide.startTime();
+            final double toTime = toSlide.startTime() + toSlide.transitionIn();
+            if (elapsedTime >= toTime) {
+                fromSlide.close();
+                return startPlaying(toSlide);
+            }
+
+            lastFade = fade;
+            fade = (float) Mth.inverseLerp(
+                    Mth.clamp(elapsedTime, fromTime, toTime),
+                    fromTime,
+                    toTime
+            );
+            updateAudio();
+            return this;
+        }
+
+        @Override
+        public void updateAudio() {
+            fromSlide.setAudioVolume(audioVolume * (1.0f - fade));
+            toSlide.setAudioVolume(audioVolume * fade);
+            if (audioSource != null) {
+                fromSlide.setAudioSource(audioSource);
+                toSlide.setAudioSource(audioSource);
+            }
+        }
+
+        @Override
+        public boolean hasFadedIn() {
+            return fromSlide.getNow() != null;
+        }
+
+        @Override
+        public double getPlaybackTime() {
+            return fromSlide.getPlaybackTime();
+        }
+
+        @Override
+        public SlideshowRenderState extractRenderState(final float partialTicks) {
+            return new SlideshowRenderState(
+                    fromSlide.getNow(),
+                    toSlide.getNow(),
+                    Mth.lerp(partialTicks, lastFade, fade)
+            );
+        }
+
+        @Override
+        public void close() {
+            fromSlide.close();
+            toSlide.close();
+        }
+    }
+
+    private record Slide(
+            int index,
+            @Nullable
+            CompletableFuture<PreparedSlide> future,
+            double startTime,
+            double endTime,
+            double transitionIn
+    ) implements AutoCloseable {
+        public boolean isEmpty() {
+            return future == null;
         }
 
         @Nullable
-        public PreparedSlideContent getContentNow() {
-            return content.getNow(null);
+        public PreparedSlide getNow() {
+            if (future == null) {
+                return null;
+            }
+            return future.getNow(null);
+        }
+
+        private void execute(final Consumer<PreparedSlide> handler) {
+            if (future == null) {
+                return;
+            }
+            if (future.isDone()) {
+                handler.accept(future.join());
+            } else {
+                future.thenAcceptAsync(handler, Minecraft.getInstance());
+            }
+        }
+
+        public void startOrSync(final PlaybackClock clock) {
+            final double time = clock.getElapsedTime() - startTime;
+            final boolean paused = clock.isPaused();
+            execute(slide -> slide.startOrSync(time, paused));
+        }
+
+        public void setAudioVolume(final float volume) {
+            execute(slide -> slide.setAudioVolume(volume));
+        }
+
+        public void setAudioSource(final AudioWorldSource source) {
+            execute(slide -> slide.setAudioSource(source));
+        }
+
+        public double getPlaybackTime() {
+            final PreparedSlide slide = getNow();
+            if (slide == null) {
+                return Double.NaN;
+            }
+            return slide.getPlaybackTime() + startTime;
+        }
+
+        @Override
+        public void close() {
+            execute(PreparedSlide::close);
         }
     }
 }

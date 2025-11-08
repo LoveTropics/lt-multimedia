@@ -18,16 +18,20 @@ public sealed interface SlideContent {
 
     Stream<MediaFile> files();
 
+    Duration duration();
+
     Type type();
 
     record Video(
             MediaFile file,
             Duration startAt,
+            Duration duration,
             float volume
     ) implements SlideContent {
         public static final MapCodec<Video> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 MediaFile.CODEC.fieldOf("file").forGetter(Video::file),
                 Slide.SECONDS_CODEC.optionalFieldOf("start_at", Duration.ZERO).forGetter(Video::startAt),
+                Slide.SECONDS_CODEC.fieldOf("duration").forGetter(Video::duration),
                 Codec.floatRange(0.0f, MAX_VOLUME).optionalFieldOf("volume", 1.0f).forGetter(Video::volume)
         ).apply(i, Video::new));
 
@@ -64,8 +68,7 @@ public sealed interface SlideContent {
 
     enum Type implements StringRepresentable {
         VIDEO("video", Video.MAP_CODEC),
-        TEXT("text", Text.MAP_CODEC),
-        ;
+        TEXT("text", Text.MAP_CODEC);;
 
         public static final Codec<Type> CODEC = StringRepresentable.fromEnum(Type::values);
 

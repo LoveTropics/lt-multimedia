@@ -14,7 +14,6 @@ import org.slf4j.Logger;
 import javax.annotation.Nullable;
 import javax.sound.sampled.AudioFormat;
 import java.io.IOException;
-import java.nio.channels.SeekableByteChannel;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Playback implements AutoCloseable {
@@ -49,7 +48,7 @@ public class Playback implements AutoCloseable {
             final MultimediaReader reader,
             final VideoDecoder videoDecoder,
             @Nullable final AudioDecoder audioDecoder,
-            final FrameSize windowSize,
+            @Nullable final FrameSize windowSize,
             final PlaybackSyncType syncType
     ) {
         sourceFrameSize = new FrameSize(videoDecoder.width(), videoDecoder.height());
@@ -71,11 +70,7 @@ public class Playback implements AutoCloseable {
         PlaybackManager.register(this);
     }
 
-    public static Playback open(final SeekableByteChannel channel, final FrameSize windowSize, final PlaybackSyncType syncType) throws IOException, DecoderException {
-        return open(MultimediaReader.open(channel), windowSize, syncType);
-    }
-
-    private static Playback open(final MultimediaReader reader, final FrameSize windowSize, final PlaybackSyncType syncType) throws IOException, DecoderException {
+    public static Playback open(final MultimediaReader reader, @Nullable final FrameSize windowSize, final PlaybackSyncType syncType) throws IOException, DecoderException {
         final VideoDecoder videoDecoder = reader.openVideoDecoder();
         if (videoDecoder == null) {
             throw new IOException("Media has no video stream");
@@ -84,7 +79,10 @@ public class Playback implements AutoCloseable {
         return new Playback(reader, videoDecoder, audioDecoder, windowSize, syncType);
     }
 
-    private FrameSize fitTextureSize(final FrameSize windowSize) {
+    private FrameSize fitTextureSize(@Nullable final FrameSize windowSize) {
+        if (windowSize == null) {
+            return sourceFrameSize;
+        }
         final FrameSize frameSize = sourceFrameSize.fitInto(windowSize);
         if (frameSize.width() > 128) {
             // ffmpeg prefers frame strides aligned to 32 bytes
@@ -93,7 +91,7 @@ public class Playback implements AutoCloseable {
         return frameSize;
     }
 
-    public void updateWindowSize(final FrameSize windowSize) {
+    public void updateWindowSize(@Nullable final FrameSize windowSize) {
         videoFrameUploader.requestFrameSize(fitTextureSize(windowSize));
     }
 
@@ -118,10 +116,6 @@ public class Playback implements AutoCloseable {
     }
 
     public void seekTo(final double time) {
-        if (time < 0.0 || time > sourceDuration) {
-            throw new IllegalArgumentException("Time must be between 0 and " + sourceDuration + " seconds");
-        }
-
         if (Mth.equal(time, clock.getElapsedTime())) {
             return;
         } else if (!clock.isPaused() && Math.abs(time - clock.getElapsedTime()) < 0.5) {
@@ -133,7 +127,7 @@ public class Playback implements AutoCloseable {
         beginSeek();
         clock.setElapsedTime(time);
 
-        packetReader.seekTo(time).whenComplete((unused, throwable) -> {
+        packetReader.seekTo(Mth.clamp(time, 0.0, sourceDuration)).whenComplete((unused, throwable) -> {
             endSeek();
             if (throwable != null) {
                 LOGGER.error("An error occurred while seeking to {}", time, throwable);

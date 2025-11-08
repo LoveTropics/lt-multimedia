@@ -18,10 +18,6 @@ public class FullScreenSlideshow implements AutoCloseable {
         this.slideshow = slideshow;
     }
 
-    public void clear() {
-        slideshow.clear();
-    }
-
     public boolean tick() {
         if (slideshow.tick()) {
             closeScreen();

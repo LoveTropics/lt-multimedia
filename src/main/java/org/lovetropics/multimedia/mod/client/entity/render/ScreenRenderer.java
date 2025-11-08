@@ -58,11 +58,6 @@ public class ScreenRenderer extends EntityRenderer<ScreenEntity, ScreenRenderSta
         state.height = entity.getHeight();
 
         final ScreenClientState screenState = slideshowManager.getScreenState(entity);
-        final SlideshowDriver slideshow = screenState != null ? screenState.slideshow() : null;
-        if (slideshow != null) {
-            state.slideshowState = slideshow.extractRenderState(partialTick);
-        } else {
-            state.slideshowState = null;
-        }
+        state.slideshowState = screenState != null ? screenState.extractRenderState(partialTick) : null;
     }
 }

@@ -46,6 +46,7 @@ public class SlideshowManager {
     @SubscribeEvent
     public void tick(final ClientTickEvent.Pre event) {
         if (fullScreenSlideshow != null && fullScreenSlideshow.tick()) {
+            fullScreenSlideshow.close();
             fullScreenSlideshow = null;
         }
 
@@ -95,12 +96,16 @@ public class SlideshowManager {
 
     public void start(final Slideshow slideshow) {
         slideshow.ensureDownloaded(mediaCache);
+        if (fullScreenSlideshow != null) {
+            fullScreenSlideshow.close();
+        }
         fullScreenSlideshow = new FullScreenSlideshow(new SlideshowDriver(mediaCache, slideshow, PlaybackSyncType.PLAYBACK));
     }
 
     public void clear() {
         if (fullScreenSlideshow != null) {
-            fullScreenSlideshow.clear();
+            fullScreenSlideshow.close();
+            fullScreenSlideshow = null;
         }
     }
 

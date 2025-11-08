@@ -4,9 +4,9 @@ import org.jetbrains.annotations.Nullable;
 
 public record SlideshowRenderState(
         @Nullable
-        PreparedSlideContent currentSlide,
+        PreparedSlide currentSlide,
         @Nullable
-        PreparedSlideContent nextSlide,
+        PreparedSlide nextSlide,
         float fade
 ) {
     public void draw(final SlideshowGraphics graphics) {
