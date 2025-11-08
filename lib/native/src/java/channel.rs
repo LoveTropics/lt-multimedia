@@ -33,7 +33,8 @@ impl io::Read for JReadableByteChannel {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let mut env = self.vm.get_env().unwrap();
 
-        let java_buf = unsafe { env.new_direct_byte_buffer(buf.as_mut_ptr(), buf.len()) }.unwrap();
+        let java_buf = unsafe { env.new_direct_byte_buffer(buf.as_mut_ptr(), buf.len()) };
+        let java_buf = java_buf.map_err(|err| io::Error::other(err))?;
 
         let result = unsafe {
             env.call_method_unchecked(
