@@ -95,7 +95,7 @@ public class SlideshowManager {
 
     public void start(final Slideshow slideshow) {
         slideshow.ensureDownloaded(mediaCache);
-        fullScreenSlideshow = new FullScreenSlideshow(new SlideshowDriver(mediaCache, slideshow, PlaybackSyncType.AUDIO));
+        fullScreenSlideshow = new FullScreenSlideshow(new SlideshowDriver(mediaCache, slideshow, PlaybackSyncType.PLAYBACK));
     }
 
     public void clear() {
