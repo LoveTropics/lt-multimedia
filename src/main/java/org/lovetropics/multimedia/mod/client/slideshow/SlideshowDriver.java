@@ -2,9 +2,9 @@ package org.lovetropics.multimedia.mod.client.slideshow;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
+import org.lovetropics.multimedia.mod.PlaybackClock;
 import org.lovetropics.multimedia.mod.client.cache.MediaFileCache;
 import org.lovetropics.multimedia.mod.client.playback.AudioWorldSource;
-import org.lovetropics.multimedia.mod.client.playback.PlaybackClock;
 import org.lovetropics.multimedia.mod.client.playback.PlaybackSyncType;
 import org.lovetropics.multimedia.mod.slideshow.Slideshow;
 
@@ -51,6 +51,30 @@ public class SlideshowDriver implements AutoCloseable {
         audioSource = source;
         if (state != null) {
             state.updateAudio();
+        }
+    }
+
+    public void seekTo(final double time, final boolean paused) {
+        clock.setElapsedTime(time);
+        if (paused) {
+            clock.pause();
+        } else {
+            clock.play();
+        }
+
+        if (state != null && state.trySeek(clock)) {
+            return;
+        }
+
+        final int index = slideQueue.getSlideIndexAt(time);
+        if (state != null) {
+            state.close();
+        }
+        final Slide currentSlide = prepareSlide(index);
+        if (time < currentSlide.startTime() + currentSlide.transitionIn()) {
+            state = startFading(prepareSlide(index - 1), currentSlide);
+        } else {
+            state = startPlaying(currentSlide);
         }
     }
 
@@ -143,6 +167,8 @@ public class SlideshowDriver implements AutoCloseable {
         @Nullable
         State tick();
 
+        boolean trySeek(PlaybackClock clock);
+
         void updateAudio();
 
         boolean hasFadedIn();
@@ -176,6 +202,16 @@ public class SlideshowDriver implements AutoCloseable {
                 return startFading(slide, nextSlide);
             }
             return this;
+        }
+
+        @Override
+        public boolean trySeek(final PlaybackClock clock) {
+            final double time = clock.getElapsedTime();
+            if (time >= slide.startTime() && time < slide.endTime()) {
+                slide.startOrSync(clock);
+                return true;
+            }
+            return false;
         }
 
         @Override
@@ -248,6 +284,11 @@ public class SlideshowDriver implements AutoCloseable {
             );
             updateAudio();
             return this;
+        }
+
+        @Override
+        public boolean trySeek(final PlaybackClock clock) {
+            return false;
         }
 
         @Override

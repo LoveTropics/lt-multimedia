@@ -1,10 +1,12 @@
 package org.lovetropics.multimedia.mod.entity;
 
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -15,15 +17,16 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
+import org.lovetropics.multimedia.mod.PlaybackClock;
 import org.lovetropics.multimedia.mod.client.playback.AudioWorldSource;
-import org.lovetropics.multimedia.mod.network.MultimediaModNetwork;
-import org.lovetropics.multimedia.mod.slideshow.Slideshow;
+import org.lovetropics.multimedia.mod.network.ClientboundClearSlideshowPacket;
+import org.lovetropics.multimedia.mod.network.ClientboundStartSlideshowPacket;
 import org.lovetropics.multimedia.mod.slideshow.SlideshowHolder;
+import org.lovetropics.multimedia.mod.slideshow.SlideshowInstanceId;
 import org.lovetropics.multimedia.mod.slideshow.Slideshows;
-
-import java.util.Optional;
 
 public class ScreenEntity extends Entity {
     public static final float DEFAULT_WIDTH = 4.0f;
@@ -33,10 +36,10 @@ public class ScreenEntity extends Entity {
     private static final EntityDataAccessor<Float> DATA_WIDTH = SynchedEntityData.defineId(ScreenEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> DATA_HEIGHT = SynchedEntityData.defineId(ScreenEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> DATA_AUDIO_RADIUS = SynchedEntityData.defineId(ScreenEntity.class, EntityDataSerializers.FLOAT);
-    private static final EntityDataAccessor<Optional<Slideshow>> DATA_CLIENT_SLIDESHOW = SynchedEntityData.defineId(ScreenEntity.class, MultimediaModNetwork.SLIDESHOW_SERIALIZER.get());
 
     @Nullable
     private SlideshowHolder slideshow;
+    private final PlaybackClock clock = new PlaybackClock();
 
     private float lastXRot;
     private float lastYRot;
@@ -45,21 +48,37 @@ public class ScreenEntity extends Entity {
         super(type, level);
     }
 
+    private SlideshowInstanceId instanceId() {
+        return SlideshowInstanceId.of(this);
+    }
+
+    @Override
+    public void startSeenByPlayer(final ServerPlayer player) {
+        super.startSeenByPlayer(player);
+        if (slideshow != null) {
+            final double time = clock.getElapsedTime();
+            player.connection.send(new ClientboundStartSlideshowPacket(instanceId(), slideshow.value(), time, clock.isPaused()));
+        }
+    }
+
     @Override
     protected void defineSynchedData(final SynchedEntityData.Builder builder) {
-        builder.define(DATA_CLIENT_SLIDESHOW, Optional.empty());
         builder.define(DATA_WIDTH, DEFAULT_WIDTH);
         builder.define(DATA_HEIGHT, DEFAULT_HEIGHT);
         builder.define(DATA_AUDIO_RADIUS, DEFAULT_AUDIO_RADIUS);
     }
 
     public void setSlideshow(@Nullable final SlideshowHolder slideshow) {
+        clock.setElapsedTime(0.0);
+        clock.play();
         this.slideshow = slideshow;
-        getEntityData().set(DATA_CLIENT_SLIDESHOW, Optional.ofNullable(slideshow).map(SlideshowHolder::value));
-    }
-
-    public Optional<Slideshow> getSlideshow() {
-        return getEntityData().get(DATA_CLIENT_SLIDESHOW);
+        final CustomPacketPayload packet;
+        if (slideshow != null) {
+            packet = new ClientboundStartSlideshowPacket(instanceId(), slideshow.value(), 0.0, clock.isPaused());
+        } else {
+            packet = new ClientboundClearSlideshowPacket(instanceId());
+        }
+        PacketDistributor.sendToPlayersTrackingEntity(this, packet);
     }
 
     public float getWidth() {
@@ -133,6 +152,8 @@ public class ScreenEntity extends Entity {
         output.putFloat("audio_radius", getAudioRadius());
         if (slideshow != null) {
             output.store("slideshow", ResourceLocation.CODEC, slideshow.id());
+            output.putDouble("time", clock.getElapsedTime());
+            output.putBoolean("paused", clock.isPaused());
         }
     }
 
@@ -144,6 +165,14 @@ public class ScreenEntity extends Entity {
         setSlideshow(input.read("slideshow", ResourceLocation.CODEC)
                 .map(Slideshows.REGISTRY::get)
                 .orElse(null));
+        if (slideshow != null) {
+            clock.setElapsedTime(input.getDoubleOr("time", 0.0));
+            if (input.getBooleanOr("paused", false)) {
+                clock.pause();
+            } else {
+                clock.play();
+            }
+        }
     }
 
     @Override

@@ -9,6 +9,7 @@ import org.lovetropics.multimedia.AudioDecoder;
 import org.lovetropics.multimedia.DecoderException;
 import org.lovetropics.multimedia.MultimediaReader;
 import org.lovetropics.multimedia.VideoDecoder;
+import org.lovetropics.multimedia.mod.PlaybackClock;
 import org.slf4j.Logger;
 
 import javax.annotation.Nullable;

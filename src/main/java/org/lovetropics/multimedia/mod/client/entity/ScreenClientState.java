@@ -13,17 +13,7 @@ public class ScreenClientState implements AutoCloseable {
     @Nullable
     private SlideshowDriver driver;
 
-    public void tick(final ScreenEntity screen, final MediaFileCache mediaCache) {
-        final Slideshow slideshow = screen.getSlideshow().orElse(null);
-        if (driver != null && !driver.slideshow().equals(slideshow)) {
-            driver.close();
-            driver = null;
-        }
-        if (slideshow != null && driver == null) {
-            slideshow.ensureDownloaded(mediaCache);
-            driver = new SlideshowDriver(mediaCache, slideshow, PlaybackSyncType.WALL_TIME);
-        }
-
+    public void tick(final ScreenEntity screen) {
         if (driver != null) {
             driver.setAudioVolume((float) MultimediaClientConfig.get().audioVolume.getAsDouble());
             driver.setAudioSource(screen.asAudioSource());
@@ -34,10 +24,26 @@ public class ScreenClientState implements AutoCloseable {
         }
     }
 
+    public void start(final MediaFileCache mediaCache, final Slideshow slideshow, final double time, final boolean paused) {
+        if (driver == null || !driver.slideshow().equals(slideshow)) {
+            if (driver != null) {
+                driver.close();
+            }
+            driver = new SlideshowDriver(mediaCache, slideshow, PlaybackSyncType.WALL_TIME);
+        }
+        driver.seekTo(time, paused);
+    }
+
     public void clear() {
         if (driver != null) {
             driver.close();
             driver = null;
+        }
+    }
+
+    public void seekTo(final double time, final boolean paused) {
+        if (driver != null) {
+            driver.seekTo(time, paused);
         }
     }
 

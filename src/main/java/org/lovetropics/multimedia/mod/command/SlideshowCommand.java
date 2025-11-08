@@ -17,8 +17,8 @@ import org.lovetropics.multimedia.mod.entity.ScreenEntity;
 import org.lovetropics.multimedia.mod.network.ClientboundClearSlideshowPacket;
 import org.lovetropics.multimedia.mod.network.ClientboundPreloadMediaPacket;
 import org.lovetropics.multimedia.mod.network.ClientboundStartSlideshowPacket;
-import org.lovetropics.multimedia.mod.slideshow.Slide;
 import org.lovetropics.multimedia.mod.slideshow.SlideshowHolder;
+import org.lovetropics.multimedia.mod.slideshow.SlideshowInstanceId;
 import org.lovetropics.multimedia.mod.slideshow.Slideshows;
 
 import java.util.Collection;
@@ -73,7 +73,7 @@ public class SlideshowCommand {
         }
         for (final Entity target : targets) {
             if (target instanceof final ServerPlayer player) {
-                player.connection.send(new ClientboundStartSlideshowPacket(slideshow.value()));
+                player.connection.send(new ClientboundStartSlideshowPacket(SlideshowInstanceId.FULL_SCREEN, slideshow.value(), 0.0, false));
             } else if (target instanceof final ScreenEntity screen) {
                 screen.setSlideshow(slideshow);
             }
@@ -84,7 +84,7 @@ public class SlideshowCommand {
     private static int clearSlideshow(final Collection<? extends Entity> targets) {
         for (final Entity target : targets) {
             if (target instanceof final ServerPlayer player) {
-                player.connection.send(new ClientboundClearSlideshowPacket());
+                player.connection.send(new ClientboundClearSlideshowPacket(SlideshowInstanceId.FULL_SCREEN));
             } else if (target instanceof final ScreenEntity screen) {
                 screen.setSlideshow(null);
             }

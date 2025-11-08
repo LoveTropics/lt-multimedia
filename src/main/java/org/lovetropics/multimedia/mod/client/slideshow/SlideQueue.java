@@ -74,6 +74,15 @@ public class SlideQueue {
         return new SlideQueue(mediaCache, slides, slideStartTimes, transitions);
     }
 
+    public int getSlideIndexAt(final double time) {
+        for (int i = 0; i < slides.size(); i++) {
+            if (time < getSlideEndTime(i)) {
+                return i;
+            }
+        }
+        return slides.size() - 1;
+    }
+
     public double getSlideStartTime(final int index) {
         return slideStartTimes.getDouble(index);
     }

@@ -67,6 +67,10 @@ public class FullScreenSlideshow implements AutoCloseable {
         }
     }
 
+    public void seekTo(final double time, final boolean paused) {
+        slideshow.seekTo(time, paused);
+    }
+
     @Override
     public void close() {
         slideshow.close();

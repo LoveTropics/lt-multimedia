@@ -64,10 +64,10 @@ public class MultimediaClientMod {
             }
         });
         event.register(ClientboundStartSlideshowPacket.TYPE, (packet, context) ->
-                slideshowManager.start(packet.sequence())
+                slideshowManager.start(packet.id(), packet.slideshow(), packet.time(), packet.paused())
         );
         event.register(ClientboundClearSlideshowPacket.TYPE, (packet, context) ->
-                slideshowManager.clear()
+                slideshowManager.clear(packet.id())
         );
     }
 }

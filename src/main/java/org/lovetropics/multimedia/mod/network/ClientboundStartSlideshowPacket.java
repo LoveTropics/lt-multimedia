@@ -1,16 +1,24 @@
 package org.lovetropics.multimedia.mod.network;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import org.lovetropics.multimedia.mod.MultimediaMod;
 import org.lovetropics.multimedia.mod.slideshow.Slideshow;
+import org.lovetropics.multimedia.mod.slideshow.SlideshowInstanceId;
 
 public record ClientboundStartSlideshowPacket(
-        Slideshow sequence
+        SlideshowInstanceId id,
+        Slideshow slideshow,
+        double time,
+        boolean paused
 ) implements CustomPacketPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundStartSlideshowPacket> STREAM_CODEC = StreamCodec.composite(
-            Slideshow.STREAM_CODEC, ClientboundStartSlideshowPacket::sequence,
+            SlideshowInstanceId.STREAM_CODEC, ClientboundStartSlideshowPacket::id,
+            Slideshow.STREAM_CODEC, ClientboundStartSlideshowPacket::slideshow,
+            ByteBufCodecs.DOUBLE, ClientboundStartSlideshowPacket::time,
+            ByteBufCodecs.BOOL, ClientboundStartSlideshowPacket::paused,
             ClientboundStartSlideshowPacket::new
     );
 

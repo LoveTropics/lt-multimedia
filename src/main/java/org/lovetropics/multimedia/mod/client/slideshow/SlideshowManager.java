@@ -19,6 +19,7 @@ import org.lovetropics.multimedia.mod.client.entity.ScreenClientState;
 import org.lovetropics.multimedia.mod.client.playback.PlaybackSyncType;
 import org.lovetropics.multimedia.mod.entity.ScreenEntity;
 import org.lovetropics.multimedia.mod.slideshow.Slideshow;
+import org.lovetropics.multimedia.mod.slideshow.SlideshowInstanceId;
 
 import javax.annotation.Nullable;
 
@@ -55,7 +56,7 @@ public class SlideshowManager {
             for (final Int2ObjectMap.Entry<ScreenClientState> entry : Int2ObjectMaps.fastIterable(screenStates)) {
                 final Entity entity = level.getEntity(entry.getIntKey());
                 if (entity instanceof final ScreenEntity screen) {
-                    entry.getValue().tick(screen, mediaCache);
+                    entry.getValue().tick(screen);
                 }
             }
         }
@@ -94,19 +95,38 @@ public class SlideshowManager {
         }
     }
 
-    public void start(final Slideshow slideshow) {
+    public void start(final SlideshowInstanceId id, final Slideshow slideshow, final double time, final boolean paused) {
         slideshow.ensureDownloaded(mediaCache);
-        if (fullScreenSlideshow != null) {
-            fullScreenSlideshow.close();
+
+        final ScreenClientState screen = getScreenState(id);
+        if (screen != null) {
+            screen.start(mediaCache, slideshow, time, paused);
+        } else if (id.isFullScreen()) {
+            if (fullScreenSlideshow != null) {
+                fullScreenSlideshow.close();
+            }
+            fullScreenSlideshow = new FullScreenSlideshow(new SlideshowDriver(mediaCache, slideshow, PlaybackSyncType.PLAYBACK));
+            fullScreenSlideshow.seekTo(time, paused);
         }
-        fullScreenSlideshow = new FullScreenSlideshow(new SlideshowDriver(mediaCache, slideshow, PlaybackSyncType.PLAYBACK));
     }
 
-    public void clear() {
-        if (fullScreenSlideshow != null) {
+    public void clear(final SlideshowInstanceId id) {
+        final ScreenClientState screen = getScreenState(id);
+        if (screen != null) {
+            screen.clear();
+        } else if (fullScreenSlideshow != null) {
             fullScreenSlideshow.close();
             fullScreenSlideshow = null;
         }
+    }
+
+    @Nullable
+    private ScreenClientState getScreenState(final SlideshowInstanceId id) {
+        final ClientLevel level = Minecraft.getInstance().level;
+        if (level == null || id.isFullScreen()) {
+            return null;
+        }
+        return screenStates.get(id.id());
     }
 
     @Nullable

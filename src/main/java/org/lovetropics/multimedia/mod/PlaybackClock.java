@@ -1,6 +1,7 @@
-package org.lovetropics.multimedia.mod.client.playback;
+package org.lovetropics.multimedia.mod;
 
 import net.minecraft.Util;
+import org.lovetropics.multimedia.mod.client.playback.ClockSyncer;
 
 public class PlaybackClock {
     private static final long TIME_NOT_SET = -1;
