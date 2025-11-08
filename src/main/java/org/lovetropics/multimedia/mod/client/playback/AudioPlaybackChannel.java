@@ -14,7 +14,7 @@ import org.lovetropics.multimedia.AudioDecoder;
 import org.lovetropics.multimedia.AudioFrame;
 import org.lovetropics.multimedia.AudioPacket;
 import org.lovetropics.multimedia.DecoderException;
-import org.lovetropics.multimedia.mod.slideshow.Slide;
+import org.lovetropics.multimedia.mod.slideshow.SlideContent;
 import org.lwjgl.openal.AL10;
 import org.lwjgl.openal.AL11;
 import org.slf4j.Logger;
@@ -65,7 +65,7 @@ import java.util.function.Consumer;
     }
 
     private void setupSource() {
-        AL10.alSourcef(source, AL10.AL_MAX_GAIN, Slide.MAX_VOLUME);
+        AL10.alSourcef(source, AL10.AL_MAX_GAIN, SlideContent.MAX_VOLUME);
         setVolume(1.0f);
         setPitch(1.0f);
         disableAttenuation();

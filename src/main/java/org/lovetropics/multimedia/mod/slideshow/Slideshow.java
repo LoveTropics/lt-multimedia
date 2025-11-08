@@ -6,9 +6,11 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.util.ExtraCodecs;
+import org.lovetropics.multimedia.mod.MediaFile;
 import org.lovetropics.multimedia.mod.client.cache.MediaFileCache;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 public record Slideshow(
         List<Slide> slides,
@@ -21,9 +23,13 @@ public record Slideshow(
 
     public static final StreamCodec<RegistryFriendlyByteBuf, Slideshow> STREAM_CODEC = ByteBufCodecs.fromCodecWithRegistries(CODEC);
 
+    public Stream<MediaFile> files() {
+        return slides.stream()
+                .flatMap(slide -> slide.content().files())
+                .distinct();
+    }
+
     public void ensureDownloaded(final MediaFileCache mediaCache) {
-        for (final Slide slide : slides) {
-            mediaCache.ensureDownloaded(slide.file());
-        }
+        files().forEach(mediaCache::ensureDownloaded);
     }
 }

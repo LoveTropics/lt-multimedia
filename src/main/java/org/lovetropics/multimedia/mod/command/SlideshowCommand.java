@@ -97,7 +97,7 @@ public class SlideshowCommand {
         if (slideshow == null) {
             throw NO_SLIDESHOW.create(id);
         }
-        final List<MediaFile> files = slideshow.value().slides().stream().map(Slide::file).distinct().toList();
+        final List<MediaFile> files = slideshow.value().files().toList();
         for (final ServerPlayer target : targets) {
             target.connection.send(new ClientboundPreloadMediaPacket(files));
         }

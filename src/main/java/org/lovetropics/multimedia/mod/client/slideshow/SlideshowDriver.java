@@ -14,6 +14,7 @@ import org.lovetropics.multimedia.mod.client.playback.FrameSize;
 import org.lovetropics.multimedia.mod.client.playback.Playback;
 import org.lovetropics.multimedia.mod.client.playback.PlaybackSyncType;
 import org.lovetropics.multimedia.mod.slideshow.Slide;
+import org.lovetropics.multimedia.mod.slideshow.SlideContent;
 import org.lovetropics.multimedia.mod.slideshow.SlideTransition;
 import org.lovetropics.multimedia.mod.slideshow.Slideshow;
 import org.slf4j.Logger;
@@ -91,7 +92,7 @@ public class SlideshowDriver implements AutoCloseable {
         final SlideTransition transitionOut = slide.transitionOut().orElse(slideshow.defaultTransition());
 
         final CompletableFuture<PreparedSlideContent> contentFuture = CompletableFuture.supplyAsync(
-                () -> prepareSlideContent(mediaCache, slide, windowSize, syncType),
+                () -> prepareSlideContent(mediaCache, slide.content(), windowSize, syncType),
                 Util.nonCriticalIoPool()
         ).thenCompose(Function.identity());
         return new PreparedSlide(contentFuture.exceptionally(throwable -> {
@@ -100,9 +101,9 @@ public class SlideshowDriver implements AutoCloseable {
         }), transitionIn, transitionOut);
     }
 
-    private static CompletableFuture<PreparedSlideContent> prepareSlideContent(final MediaFileCache mediaCache, final Slide slide, final FrameSize windowSize, final PlaybackSyncType syncType) {
+    private static CompletableFuture<PreparedSlideContent> prepareSlideContent(final MediaFileCache mediaCache, final SlideContent slide, final FrameSize windowSize, final PlaybackSyncType syncType) {
         return switch (slide) {
-            case final Slide.Video video -> {
+            case final SlideContent.Video video -> {
                 final SeekableByteChannel channel;
                 try {
                     channel = mediaCache.openChannel(video.file());
