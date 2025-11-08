@@ -50,7 +50,7 @@ import java.util.function.Consumer;
     @Nullable
     private AudioWorldSource worldSource;
 
-    private boolean seeking;
+    private volatile boolean seeking;
 
     private volatile boolean closed;
 
@@ -123,13 +123,6 @@ import java.util.function.Consumer;
         setRelative(false);
     }
 
-    public void beginSeek() {
-        if (!seeking) {
-            reset();
-            seeking = true;
-        }
-    }
-
     private void reset() {
         // Bit of a hack - the source must not be in the AL_INITIAL state in order to unqueue its buffers
         if (AL10.alGetSourcei(source, AL10.AL_SOURCE_STATE) == AL10.AL_INITIAL) {
@@ -169,16 +162,20 @@ import java.util.function.Consumer;
             setSelfPosition(worldSource.resolveSourcePos(listenerTransform));
         }
 
-        final int processedBuffers = playing() ? removeProcessedBuffers() : 0;
+        final boolean stopped = AL10.alGetSourcei(source, AL10.AL_SOURCE_STATE) == AL10.AL_STOPPED;
+        final int processedBuffers = stopped && clock.isPaused() ? 0 : removeProcessedBuffers();
         for (int i = 0; i < processedBuffers; i++) {
             lastPlayedFrameEndTime = queuedFrameEndTimes.removeFirst();
+        }
+
+        if (playing() && clock.isPaused()) {
+            pause();
         }
 
         final double speedFactor = syncClocks();
         tryQueueFrames(lastPlayedFrameEndTime + QUEUE_AT_LEAST_SECONDS, speedFactor);
 
         if (!playing() && !clock.isPaused() && !queuedFrameEndTimes.isEmpty()) {
-            // Somehow ran out of samples, but we're ready to resume again
             play();
         }
     }
@@ -293,8 +290,26 @@ import java.util.function.Consumer;
             this.inner = inner;
         }
 
-        public CompletableFuture<Void> execute(final Consumer<AudioPlaybackChannel> consumer) {
-            return inner.thenAcceptAsync(consumer, channelAccess.executor);
+        private void execute(final Consumer<AudioPlaybackChannel> consumer) {
+            inner.thenAcceptAsync(consumer, channelAccess.executor);
+        }
+
+        public void setVolume(final float volume) {
+            execute(channel -> channel.setVolume(volume));
+        }
+
+        public void setWorldSource(final AudioWorldSource source) {
+            execute(channel -> channel.setWorldSource(source));
+        }
+
+        public void beginSeek() {
+            // Don't wait for scheduling, stop processing audio frames immediately
+            inner.join().seeking = true;
+            execute(AudioPlaybackChannel::reset);
+        }
+
+        public void endSeek() {
+            execute(AudioPlaybackChannel::endSeek);
         }
 
         @Override

@@ -3,8 +3,8 @@ package org.lovetropics.multimedia.mod.client.playback;
 import com.mojang.blaze3d.systems.GpuDevice;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.logging.LogUtils;
-import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
+import net.minecraft.util.Mth;
 import org.lovetropics.multimedia.AudioDecoder;
 import org.lovetropics.multimedia.DecoderException;
 import org.lovetropics.multimedia.MultimediaReader;
@@ -15,10 +15,7 @@ import javax.annotation.Nullable;
 import javax.sound.sampled.AudioFormat;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
-import java.util.Queue;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.function.Supplier;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class Playback implements AutoCloseable {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -45,8 +42,8 @@ public class Playback implements AutoCloseable {
 
     private final VideoFrameTexture texture;
 
-    private final Queue<Runnable> taskQueue = new ConcurrentLinkedQueue<>();
-    private CompletableFuture<?> controlFuture = CompletableFuture.completedFuture(null);
+    private final ReentrantLock seekLock = new ReentrantLock();
+    private int seekCount;
 
     private Playback(
             final MultimediaReader reader,
@@ -102,109 +99,74 @@ public class Playback implements AutoCloseable {
 
     public void setAudioVolume(final float volume) {
         if (audioPlayback != null) {
-            audioPlayback.execute(channel ->
-                    channel.setVolume(volume)
-            );
+            audioPlayback.setVolume(volume);
         }
     }
 
     public void setAudioSource(final AudioWorldSource source) {
         if (audioPlayback != null) {
-            audioPlayback.execute(channel ->
-                    channel.setWorldSource(source)
-            );
-        }
-    }
-
-    private void scheduleControl(final Supplier<CompletableFuture<?>> task) {
-        if (controlFuture.isDone()) {
-            controlFuture = task.get();
-        } else {
-            controlFuture = controlFuture.thenComposeAsync(ignored -> task.get(), taskQueue::add);
+            audioPlayback.setWorldSource(source);
         }
     }
 
     public void play() {
-        scheduleControl(this::playInternal);
-    }
-
-    private CompletableFuture<?> playInternal() {
-        if (!clock.isPaused()) {
-            return CompletableFuture.completedFuture(null);
-        }
-        if (audioPlayback != null) {
-            return audioPlayback.execute(channel -> {
-                channel.play();
-                clock.play();
-            });
-        } else {
-            clock.play();
-            return CompletableFuture.completedFuture(null);
-        }
+        clock.play();
     }
 
     public void pause() {
-        scheduleControl(this::pauseInternal);
-    }
-
-    private CompletableFuture<?> pauseInternal() {
-        if (clock.isPaused()) {
-            return CompletableFuture.completedFuture(null);
-        }
-        if (audioPlayback != null) {
-            return audioPlayback.execute(channel -> {
-                channel.pause();
-                clock.pause();
-            });
-        } else {
-            clock.pause();
-            return CompletableFuture.completedFuture(null);
-        }
+        clock.pause();
     }
 
     public void seekTo(final double time) {
         if (time < 0.0 || time > sourceDuration) {
             throw new IllegalArgumentException("Time must be between 0 and " + sourceDuration + " seconds");
         }
-        scheduleControl(() -> seekToInternal(time));
+
+        if (Mth.equal(time, clock.getElapsedTime())) {
+            return;
+        } else if (!clock.isPaused() && Math.abs(time - clock.getElapsedTime()) < 0.5) {
+            // Within a small enough margin, slow down or speed up frames to get to our target
+            clock.setElapsedTime(time);
+            return;
+        }
+
+        beginSeek();
+        clock.setElapsedTime(time);
+
+        packetReader.seekTo(time).whenComplete((unused, throwable) -> {
+            endSeek();
+            if (throwable != null) {
+                LOGGER.error("An error occurred while seeking to {}", time, throwable);
+            }
+        });
     }
 
-    private CompletableFuture<?> seekToInternal(final double time) {
-        if (clock.getElapsedTime() == time) {
-            return CompletableFuture.completedFuture(null);
-        }
-
-        final boolean wasPaused = clock.isPaused();
-        clock.pause();
-
-        CompletableFuture<?> future = CompletableFuture.completedFuture(null);
-
-        videoFrameUploader.beginSeek();
-        if (audioPlayback != null) {
-            future = audioPlayback.execute(AudioPlaybackChannel::beginSeek);
-        }
-
-        future = future.thenCompose(ignored -> packetReader.seekTo(time));
-        future = future.thenRunAsync(() -> {
-            clock.setElapsedTime(time);
-            if (!wasPaused) {
-                clock.play();
+    private void beginSeek() {
+        seekLock.lock();
+        try {
+            if (seekCount++ == 0) {
+                videoFrameUploader.beginSeek();
+                if (audioPlayback != null) {
+                    audioPlayback.beginSeek();
+                }
             }
-            videoFrameUploader.endSeek();
-        }, taskQueue::add);
-
-        if (audioPlayback != null) {
-            future = future.thenCompose(ignored ->
-                    audioPlayback.execute(AudioPlaybackChannel::endSeek)
-            );
+        } finally {
+            seekLock.unlock();
         }
+    }
 
-        future.exceptionally(throwable -> {
-            LOGGER.error("Failed to seek to {}", time, throwable);
-            return null;
-        });
-
-        return future;
+    private void endSeek() {
+        seekLock.lock();
+        try {
+            if (--seekCount == 0) {
+                videoFrameUploader.endSeek();
+                if (audioPlayback != null) {
+                    audioPlayback.endSeek();
+                }
+            }
+        } finally {
+            seekLock.unlock();
+        }
     }
 
     public double currentTime() {
@@ -227,21 +189,12 @@ public class Playback implements AutoCloseable {
     }
 
     /* package-private */ void endFrame() {
-        runTasks();
         videoFrameUploader.tick();
-    }
-
-    private void runTasks() {
-        Runnable task;
-        while ((task = taskQueue.poll()) != null) {
-            task.run();
-        }
     }
 
     @Override
     public void close() {
         PlaybackManager.unregister(this);
-        clock.pause();
         packetReader.close();
         videoFrameUploader.close();
         videoDecoder.close();

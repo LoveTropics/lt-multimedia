@@ -51,7 +51,7 @@ public class VideoFrameUploader implements AutoCloseable {
             nextWriteIndex = 0;
             nextReadIndex = 0;
             for (final FrameBuffer buffer : frameBuffers) {
-                buffer.discardAndFreeze();
+                buffer.discardAndFreeze(device, requestedFrameSize);
             }
         } finally {
             writeFrameLock.unlock();
@@ -66,7 +66,7 @@ public class VideoFrameUploader implements AutoCloseable {
             }
             seeking = false;
             for (final FrameBuffer buffer : frameBuffers) {
-                buffer.unfreeze(device, requestedFrameSize);
+                buffer.unfreeze();
             }
         } finally {
             writeFrameLock.unlock();
@@ -132,6 +132,10 @@ public class VideoFrameUploader implements AutoCloseable {
 
     @Nullable
     public PresentableVideoFrame takeNextFrame() {
+        if (seeking) {
+            return null;
+        }
+
         final FrameBuffer buffer = frameBuffers[nextReadIndex];
         if (!buffer.isReadyToPresent() || clock.getElapsedTime() < buffer.presentTime) {
             return null;
@@ -283,6 +287,7 @@ public class VideoFrameUploader implements AutoCloseable {
             final GpuBuffer.MappedView mappedView = Objects.requireNonNull(this.mappedView);
             presentTime = frame.presentTime();
             frame.unpackPixels(frameSize.width(), frameSize.height(), mappedView.data());
+            mappedView.data().flip();
             updateState(State.WRITE_BEGIN, State.WRITE_END);
             return true;
         }
@@ -310,7 +315,7 @@ public class VideoFrameUploader implements AutoCloseable {
             tickRecycle(device, requestedFrameSize);
         }
 
-        public void discardAndFreeze() {
+        public void discardAndFreeze(final GpuDevice device, final FrameSize requestedFrameSize) {
             final State state = this.state.get();
             if (state == State.CLOSED) {
                 return;
@@ -318,22 +323,18 @@ public class VideoFrameUploader implements AutoCloseable {
                 throw new IllegalStateException("Cannot discard while write is in progress");
             }
 
-            updateState(state, State.FROZEN);
-
-            final GpuBuffer.MappedView mappedView = this.mappedView;
-            this.mappedView = null;
-            if (mappedView != null) {
-                mappedView.close();
-            }
             if (recycleFence != null) {
                 recycleFence.awaitCompletion(Long.MAX_VALUE);
                 recycleFence = null;
             }
+            if (mappedView == null) {
+                mapBuffer(device, requestedFrameSize);
+            }
+            updateState(state, State.FROZEN);
         }
 
-        public void unfreeze(final GpuDevice device, final FrameSize requestedFrameSize) {
+        public void unfreeze() {
             updateState(State.FROZEN, State.READY_FOR_WRITE);
-            mapBuffer(device, requestedFrameSize);
         }
 
         @Override
