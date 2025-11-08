@@ -55,13 +55,13 @@ public class Playback implements AutoCloseable {
         sourceFrameSize = new FrameSize(videoDecoder.width(), videoDecoder.height());
         sourceDuration = reader.duration();
 
-        clock = new PlaybackClock(syncType);
+        clock = new PlaybackClock();
 
         packetReader = new PacketReader(reader);
-        videoFrameUploader = new VideoFrameUploader(RenderSystem.getDevice(), fitTextureSize(windowSize), clock);
+        videoFrameUploader = new VideoFrameUploader(RenderSystem.getDevice(), fitTextureSize(windowSize), clock.createSyncer(false));
         this.videoDecoder = new PlaybackVideoDecoder(packetReader, videoDecoder, videoFrameUploader);
         if (audioDecoder != null) {
-            audioPlayback = AudioPlaybackChannel.create(Minecraft.getInstance().getSoundManager(), packetReader, audioDecoder, clock);
+            audioPlayback = AudioPlaybackChannel.create(Minecraft.getInstance().getSoundManager(), packetReader, audioDecoder, syncType.createAudioSyncer(clock));
         } else {
             audioPlayback = null;
         }

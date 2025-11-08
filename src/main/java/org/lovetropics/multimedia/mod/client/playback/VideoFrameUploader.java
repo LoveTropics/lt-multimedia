@@ -21,7 +21,7 @@ public class VideoFrameUploader implements AutoCloseable {
 
     private final GpuDevice device;
     private FrameSize requestedFrameSize;
-    private final PlaybackClock clock;
+    private final ClockSyncer clock;
 
     private final FrameBuffer[] frameBuffers = new FrameBuffer[BUFFER_COUNT];
     private int nextWriteIndex;
@@ -32,7 +32,7 @@ public class VideoFrameUploader implements AutoCloseable {
 
     private boolean seeking;
 
-    public VideoFrameUploader(final GpuDevice device, final FrameSize frameSize, final PlaybackClock clock) {
+    public VideoFrameUploader(final GpuDevice device, final FrameSize frameSize, final ClockSyncer clock) {
         this.device = device;
         requestedFrameSize = frameSize;
         for (int i = 0; i < frameBuffers.length; i++) {

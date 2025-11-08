@@ -37,7 +37,7 @@ import java.util.function.Consumer;
     private final SoundManager soundManager;
     private final PacketReader packets;
     private final AudioDecoder decoder;
-    private final PlaybackClock clock;
+    private final ClockSyncer clock;
 
     private final AudioSampler sampler;
 
@@ -54,7 +54,7 @@ import java.util.function.Consumer;
 
     private volatile boolean closed;
 
-    private AudioPlaybackChannel(final int source, final SoundManager soundManager, final PacketReader packets, final AudioDecoder decoder, final PlaybackClock clock) {
+    private AudioPlaybackChannel(final int source, final SoundManager soundManager, final PacketReader packets, final AudioDecoder decoder, final ClockSyncer clock) {
         super(source);
         this.soundManager = soundManager;
         this.packets = packets;
@@ -74,7 +74,7 @@ import java.util.function.Consumer;
         setRelative(true);
     }
 
-    public static Handle create(final SoundManager soundManager, final PacketReader packets, final AudioDecoder decoder, final PlaybackClock clock) {
+    public static Handle create(final SoundManager soundManager, final PacketReader packets, final AudioDecoder decoder, final ClockSyncer clock) {
         final ChannelAccess channelAccess = soundManager.soundEngine.channelAccess;
         final CompletableFuture<AudioPlaybackChannel> future = CompletableFuture.supplyAsync(() -> {
             final int[] sources = new int[1];

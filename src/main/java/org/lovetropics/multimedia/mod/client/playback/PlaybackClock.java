@@ -6,14 +6,8 @@ public class PlaybackClock {
     private static final long TIME_NOT_SET = -1;
     private static final double SECONDS_TO_NANOS = 1000_000_000.0;
 
-    private final PlaybackSyncType syncType;
-
     private volatile long startedAt = TIME_NOT_SET;
     private volatile long pausedAt = TIME_NOT_SET;
-
-    public PlaybackClock(final PlaybackSyncType syncType) {
-        this.syncType = syncType;
-    }
 
     public synchronized void play() {
         if (startedAt == TIME_NOT_SET) {
@@ -40,14 +34,6 @@ public class PlaybackClock {
         }
     }
 
-    public synchronized boolean requestSyncTo(final double elapsedTime) {
-        if (syncType != PlaybackSyncType.WALL_TIME) {
-            setElapsedTime(elapsedTime);
-            return true;
-        }
-        return false;
-    }
-
     private long getCurrentTimestamp() {
         return pausedAt != TIME_NOT_SET ? pausedAt : Util.getNanos();
     }
@@ -61,5 +47,28 @@ public class PlaybackClock {
 
     public synchronized boolean isPaused() {
         return startedAt == TIME_NOT_SET || pausedAt != TIME_NOT_SET;
+    }
+
+    public ClockSyncer createSyncer(final boolean authoritative) {
+        return new ClockSyncer() {
+            @Override
+            public boolean requestSyncTo(final double elapsedTime) {
+                if (authoritative) {
+                    setElapsedTime(elapsedTime);
+                    return true;
+                }
+                return false;
+            }
+
+            @Override
+            public double getElapsedTime() {
+                return PlaybackClock.this.getElapsedTime();
+            }
+
+            @Override
+            public boolean isPaused() {
+                return PlaybackClock.this.isPaused();
+            }
+        };
     }
 }
