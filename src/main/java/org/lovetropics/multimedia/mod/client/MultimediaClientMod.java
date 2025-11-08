@@ -16,6 +16,7 @@ import org.lovetropics.multimedia.mod.client.entity.render.ScreenRenderer;
 import org.lovetropics.multimedia.mod.client.slideshow.SlideshowManager;
 import org.lovetropics.multimedia.mod.network.ClientboundClearSlideshowPacket;
 import org.lovetropics.multimedia.mod.network.ClientboundPreloadMediaPacket;
+import org.lovetropics.multimedia.mod.network.ClientboundSeekSlideshowPacket;
 import org.lovetropics.multimedia.mod.network.ClientboundStartSlideshowPacket;
 
 import javax.annotation.Nullable;
@@ -68,6 +69,9 @@ public class MultimediaClientMod {
         );
         event.register(ClientboundClearSlideshowPacket.TYPE, (packet, context) ->
                 slideshowManager.clear(packet.id())
+        );
+        event.register(ClientboundSeekSlideshowPacket.TYPE, (packet, context) ->
+                slideshowManager.seekTo(packet.id(), packet.time(), packet.paused())
         );
     }
 }

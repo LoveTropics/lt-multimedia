@@ -120,6 +120,15 @@ public class SlideshowManager {
         }
     }
 
+    public void seekTo(final SlideshowInstanceId id, final double time, final boolean paused) {
+        final ScreenClientState screen = getScreenState(id);
+        if (screen != null) {
+            screen.seekTo(time, paused);
+        } else if (id.isFullScreen() && fullScreenSlideshow != null) {
+            fullScreenSlideshow.seekTo(time, paused);
+        }
+    }
+
     @Nullable
     private ScreenClientState getScreenState(final SlideshowInstanceId id) {
         final ClientLevel level = Minecraft.getInstance().level;

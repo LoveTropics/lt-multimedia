@@ -23,6 +23,7 @@ import org.joml.Quaternionf;
 import org.lovetropics.multimedia.mod.PlaybackClock;
 import org.lovetropics.multimedia.mod.client.playback.AudioWorldSource;
 import org.lovetropics.multimedia.mod.network.ClientboundClearSlideshowPacket;
+import org.lovetropics.multimedia.mod.network.ClientboundSeekSlideshowPacket;
 import org.lovetropics.multimedia.mod.network.ClientboundStartSlideshowPacket;
 import org.lovetropics.multimedia.mod.slideshow.SlideshowHolder;
 import org.lovetropics.multimedia.mod.slideshow.SlideshowInstanceId;
@@ -79,6 +80,24 @@ public class ScreenEntity extends Entity {
             packet = new ClientboundClearSlideshowPacket(instanceId());
         }
         PacketDistributor.sendToPlayersTrackingEntity(this, packet);
+    }
+
+    public void seekSlideshow(final double time) {
+        if (slideshow != null) {
+            clock.setElapsedTime(time);
+            PacketDistributor.sendToPlayersTrackingEntity(this, new ClientboundSeekSlideshowPacket(instanceId(), time, clock.isPaused()));
+        }
+    }
+
+    public void setPaused(final boolean paused) {
+        if (slideshow != null) {
+            if (paused) {
+                clock.pause();
+            } else {
+                clock.play();
+            }
+            PacketDistributor.sendToPlayersTrackingEntity(this, new ClientboundSeekSlideshowPacket(instanceId(), clock.getElapsedTime(), paused));
+        }
     }
 
     public float getWidth() {

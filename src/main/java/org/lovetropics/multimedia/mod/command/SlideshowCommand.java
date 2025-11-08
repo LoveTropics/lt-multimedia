@@ -16,6 +16,7 @@ import org.lovetropics.multimedia.mod.MultimediaMod;
 import org.lovetropics.multimedia.mod.entity.ScreenEntity;
 import org.lovetropics.multimedia.mod.network.ClientboundClearSlideshowPacket;
 import org.lovetropics.multimedia.mod.network.ClientboundPreloadMediaPacket;
+import org.lovetropics.multimedia.mod.network.ClientboundSeekSlideshowPacket;
 import org.lovetropics.multimedia.mod.network.ClientboundStartSlideshowPacket;
 import org.lovetropics.multimedia.mod.slideshow.SlideshowHolder;
 import org.lovetropics.multimedia.mod.slideshow.SlideshowInstanceId;
@@ -24,9 +25,12 @@ import org.lovetropics.multimedia.mod.slideshow.Slideshows;
 import java.util.Collection;
 import java.util.List;
 
+import static com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg;
+import static com.mojang.brigadier.arguments.DoubleArgumentType.getDouble;
 import static net.minecraft.commands.Commands.argument;
 import static net.minecraft.commands.Commands.literal;
-import static net.minecraft.commands.arguments.EntityArgument.*;
+import static net.minecraft.commands.arguments.EntityArgument.entities;
+import static net.minecraft.commands.arguments.EntityArgument.getEntities;
 import static net.minecraft.commands.arguments.ResourceLocationArgument.getId;
 import static net.minecraft.commands.arguments.ResourceLocationArgument.id;
 
@@ -38,8 +42,9 @@ public class SlideshowCommand {
     public static void register(final RegisterCommandsEvent event) {
         event.getDispatcher().register(literal("slideshow")
                 .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
-                .then(literal("start")
-                        .then(argument("targets", entities())
+                .then(argument("targets", entities())
+                        .then(literal("play")
+                                .executes(context -> setSlideshowPaused(getEntities(context, "targets"), false))
                                 .then(argument("id", id())
                                         .suggests((context, builder) ->
                                                 SharedSuggestionProvider.suggestResource(Slideshows.REGISTRY.keySet(), builder)
@@ -47,19 +52,23 @@ public class SlideshowCommand {
                                         .executes(context -> startSlideshow(getEntities(context, "targets"), getId(context, "id")))
                                 )
                         )
-                )
-                .then(literal("clear")
-                        .then(argument("targets", entities())
-                                    .executes(context -> clearSlideshow(getEntities(context, "targets")))
+                        .then(literal("pause")
+                                .executes(context -> setSlideshowPaused(getEntities(context, "targets"), true))
                         )
-                )
-                .then(literal("preload")
-                        .then(argument("targets", players())
+                        .then(literal("seek")
+                                .then(argument("seconds", doubleArg(0.0))
+                                        .executes(context -> seekSlideshow(getEntities(context, "targets"), getDouble(context, "seconds")))
+                                )
+                        )
+                        .then(literal("clear")
+                                .executes(context -> clearSlideshow(getEntities(context, "targets")))
+                        )
+                        .then(literal("preload")
                                 .then(argument("id", id())
                                         .suggests((context, builder) ->
                                                 SharedSuggestionProvider.suggestResource(Slideshows.REGISTRY.keySet(), builder)
                                         )
-                                        .executes(context -> preloadSlideshow(getPlayers(context, "targets"), getId(context, "id")))
+                                        .executes(context -> preloadSlideshow(getEntities(context, "targets"), getId(context, "id")))
                                 )
                         )
                 )
@@ -92,14 +101,40 @@ public class SlideshowCommand {
         return targets.size();
     }
 
-    private static int preloadSlideshow(final Collection<ServerPlayer> targets, final ResourceLocation id) throws CommandSyntaxException {
+    private static int setSlideshowPaused(final Collection<? extends Entity> targets, final boolean paused) {
+        for (final Entity target : targets) {
+            if (target instanceof final ServerPlayer player) {
+                // TODO: Store full-screen slideshow states server-side, preserve time
+                player.connection.send(new ClientboundSeekSlideshowPacket(SlideshowInstanceId.FULL_SCREEN, 0.0, paused));
+            } else if (target instanceof final ScreenEntity screen) {
+                screen.setPaused(paused);
+            }
+        }
+        return targets.size();
+    }
+
+    private static int seekSlideshow(final Collection<? extends Entity> targets, final double seconds) {
+        for (final Entity target : targets) {
+            if (target instanceof final ServerPlayer player) {
+                // TODO: Store full-screen slideshow states server-side, preserve paused
+                player.connection.send(new ClientboundSeekSlideshowPacket(SlideshowInstanceId.FULL_SCREEN, seconds, false));
+            } else if (target instanceof final ScreenEntity screen) {
+                screen.seekSlideshow(seconds);
+            }
+        }
+        return targets.size();
+    }
+
+    private static int preloadSlideshow(final Collection<? extends Entity> targets, final ResourceLocation id) throws CommandSyntaxException {
         final SlideshowHolder slideshow = Slideshows.REGISTRY.get(id);
         if (slideshow == null) {
             throw NO_SLIDESHOW.create(id);
         }
         final List<MediaFile> files = slideshow.value().files().toList();
-        for (final ServerPlayer target : targets) {
-            target.connection.send(new ClientboundPreloadMediaPacket(files));
+        for (final Entity target : targets) {
+            if (target instanceof final ServerPlayer player) {
+                player.connection.send(new ClientboundPreloadMediaPacket(files));
+            }
         }
         return targets.size();
     }

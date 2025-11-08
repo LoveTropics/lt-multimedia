@@ -21,5 +21,6 @@ public final class MultimediaModNetwork {
         registrar.playToClient(ClientboundPreloadMediaPacket.TYPE, ClientboundPreloadMediaPacket.STREAM_CODEC);
         registrar.playToClient(ClientboundStartSlideshowPacket.TYPE, ClientboundStartSlideshowPacket.STREAM_CODEC);
         registrar.playToClient(ClientboundClearSlideshowPacket.TYPE, ClientboundClearSlideshowPacket.STREAM_CODEC);
+        registrar.playToClient(ClientboundSeekSlideshowPacket.TYPE, ClientboundSeekSlideshowPacket.STREAM_CODEC);
     }
 }
