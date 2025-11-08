@@ -2,9 +2,11 @@ package org.lovetropics.multimedia.mod.client.slideshow;
 
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.logging.LogUtils;
+import net.minecraft.ChatFormatting;
 import net.minecraft.SharedConstants;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import org.apache.commons.io.IOUtils;
 import org.lovetropics.multimedia.DecoderException;
@@ -22,6 +24,7 @@ import org.slf4j.Logger;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
@@ -29,6 +32,11 @@ import java.util.function.Function;
 
 public class SlideshowDriver implements AutoCloseable {
     private static final Logger LOGGER = LogUtils.getLogger();
+
+    private static final PreparedSlideContent.Text ERROR_CONTENT = new PreparedSlideContent.Text(
+            Component.translatable("slideshow.slide.error").withStyle(ChatFormatting.RED),
+            Duration.ofSeconds(5)
+        );
 
     private final MediaFileCache mediaCache;
     private final Slideshow slideshow;
@@ -97,7 +105,7 @@ public class SlideshowDriver implements AutoCloseable {
         ).thenCompose(Function.identity());
         return new PreparedSlide(contentFuture.exceptionally(throwable -> {
             LOGGER.error("An unexpected error occurred while preparing slide", throwable);
-            return new PreparedSlideContent.Error();
+            return ERROR_CONTENT;
         }), transitionIn, transitionOut);
     }
 
@@ -109,7 +117,7 @@ public class SlideshowDriver implements AutoCloseable {
                     channel = mediaCache.openChannel(video.file());
                 } catch (final IOException e) {
                     LOGGER.error("Failed to load video slide", e);
-                    yield CompletableFuture.completedFuture(new PreparedSlideContent.Error());
+                    yield CompletableFuture.completedFuture(ERROR_CONTENT);
                 }
                 yield CompletableFuture.supplyAsync(() -> {
                     try {
@@ -119,10 +127,12 @@ public class SlideshowDriver implements AutoCloseable {
                     } catch (final IOException | DecoderException e) {
                         IOUtils.closeQuietly(channel);
                         LOGGER.error("Failed to load video slide", e);
-                        return new PreparedSlideContent.Error();
+                        return ERROR_CONTENT;
                     }
                 }, Minecraft.getInstance());
             }
+            case final SlideContent.Text text ->
+                    CompletableFuture.completedFuture(new PreparedSlideContent.Text(text.text(), text.duration()));
         };
     }
 

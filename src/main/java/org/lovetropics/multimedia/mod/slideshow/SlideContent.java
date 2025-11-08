@@ -3,6 +3,8 @@ package org.lovetropics.multimedia.mod.slideshow;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.util.StringRepresentable;
 import org.lovetropics.multimedia.mod.MediaFile;
 
@@ -40,8 +42,29 @@ public sealed interface SlideContent {
         }
     }
 
+    record Text(
+            Component text,
+            Duration duration
+    ) implements SlideContent {
+        public static final MapCodec<Text> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+                ComponentSerialization.CODEC.fieldOf("text").forGetter(Text::text),
+                Slide.SECONDS_CODEC.fieldOf("duration").forGetter(Text::duration)
+        ).apply(i, Text::new));
+
+        @Override
+        public Stream<MediaFile> files() {
+            return Stream.empty();
+        }
+
+        @Override
+        public Type type() {
+            return Type.TEXT;
+        }
+    }
+
     enum Type implements StringRepresentable {
         VIDEO("video", Video.MAP_CODEC),
+        TEXT("text", Text.MAP_CODEC),
         ;
 
         public static final Codec<Type> CODEC = StringRepresentable.fromEnum(Type::values);

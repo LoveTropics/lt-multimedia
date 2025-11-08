@@ -118,9 +118,11 @@ public interface SlideshowGraphics {
 
             @Override
             public void drawCenteredText(final Component text, final int x, final int y, final int color) {
+                poseStack.pushPose();
+                poseStack.scale(1.0f / 16.0f, -1.0f / 16.0f, 1.0f / 16.0f);
                 font.drawInBatch(text,
-                        -worldWidth / 2.0f + (float) x / frameSize.width() * worldWidth,
-                        -worldHeight / 2.0f + (float) y / frameSize.height() * worldHeight,
+                        -worldWidth / 2.0f + (float) x / frameSize.width() * worldWidth - font.width(text) / 2.0f,
+                        -worldHeight / 2.0f + (float) y / frameSize.height() * worldHeight - font.lineHeight / 2.0f,
                         color,
                         true,
                         poseStack.last().pose(),
@@ -130,6 +132,7 @@ public interface SlideshowGraphics {
                         lightCoords
                 );
                 poseStack.translate(0.0f, 0.0f, Z_OFFSET);
+                poseStack.popPose();
             }
         };
     }

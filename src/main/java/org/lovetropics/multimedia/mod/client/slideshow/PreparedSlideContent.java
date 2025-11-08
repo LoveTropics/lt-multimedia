@@ -3,7 +3,6 @@ package org.lovetropics.multimedia.mod.client.slideshow;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.ARGB;
-import net.minecraft.util.CommonColors;
 import org.lovetropics.multimedia.mod.client.playback.AudioWorldSource;
 import org.lovetropics.multimedia.mod.client.playback.FrameSize;
 import org.lovetropics.multimedia.mod.client.playback.Playback;
@@ -69,11 +68,15 @@ public interface PreparedSlideContent extends AutoCloseable {
         }
     }
 
-    class Error implements PreparedSlideContent {
-        private static final Duration DURATION = Duration.ofSeconds(5);
-        private static final Component MESSAGE = Component.translatable("slideshow.slide.error");
-
+    class Text implements PreparedSlideContent {
+        private final Component text;
+        private final Duration duration;
         private Instant swapAfter = Instant.MAX;
+
+        public Text(final Component text, final Duration duration) {
+            this.text = text;
+            this.duration = duration;
+        }
 
         @Override
         public boolean isReadyToSwapOut() {
@@ -82,12 +85,12 @@ public interface PreparedSlideContent extends AutoCloseable {
 
         @Override
         public void start() {
-            swapAfter = Instant.now().plus(DURATION);
+            swapAfter = Instant.now().plus(duration);
         }
 
         @Override
         public void draw(final SlideshowGraphics graphics, final float alpha) {
-            graphics.drawCenteredText(MESSAGE, graphics.width() / 2, graphics.height() / 2, ARGB.color(alpha, CommonColors.RED));
+            graphics.drawCenteredText(text, graphics.width() / 2, graphics.height() / 2, ARGB.white(alpha));
         }
 
         @Override
