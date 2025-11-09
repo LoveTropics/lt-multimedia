@@ -1,5 +1,6 @@
 package org.lovetropics.multimedia.mod.client.slideshow;
 
+import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
@@ -11,6 +12,7 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector2fc;
@@ -20,6 +22,7 @@ import org.lovetropics.multimedia.mod.client.playback.FrameSize;
 
 public interface SlideshowGraphics {
     double LOG_2 = Math.log(2.0);
+    FrameSize BASE_GUI_SIZE = new FrameSize(Window.BASE_WIDTH, Window.BASE_HEIGHT);
 
     static float roundLog2(final float value) {
         return (float) Math.pow(2.0, Mth.ceil(Math.log(value) / LOG_2));
@@ -51,15 +54,24 @@ public interface SlideshowGraphics {
             }
 
             @Override
-            public void drawCenteredText(final Component text, final int x, final int y, final int color) {
-                graphics.drawCenteredString(font, text, x, y, color);
+            public void drawText(final FormattedCharSequence text, final int x, final int y, final int color, final int scale) {
+                graphics.pose().pushMatrix();
+                graphics.pose().translate(x, y);
+                graphics.pose().scale(scale);
+                graphics.drawString(font, text, 0, 0, color);
+                graphics.pose().popMatrix();
+            }
+
+            @Override
+            public Font font() {
+                return font;
             }
         };
     }
 
     @Nullable
     static SlideshowGraphics forWorld(final PoseStack.Pose pose, final float worldWidth, final float worldHeight, final int lightCoords, final MultiBufferSource bufferSource, final Font font) {
-        final FrameSize frameSize = new FrameSize(Math.round(worldWidth * 16), Math.round(worldHeight * 16));
+        final FrameSize frameSize = new FrameSize(Math.round(worldWidth * 16), Math.round(worldHeight * 16)).resizeInto(BASE_GUI_SIZE);
 
         final Vector2fc screenSizePixels = ScreenSizeCapture.sizeInScreenPixels(pose,
                 new Vector3f(-worldWidth / 2.0f, -worldHeight / 2.0f, 0.0f),
@@ -81,7 +93,7 @@ public interface SlideshowGraphics {
         poseStack.mulPose(pose.pose());
 
         return new SlideshowGraphics() {
-            private static final float Z_OFFSET = 0.01f;
+            private static final float Z_OFFSET = 0.001f;
 
             @Override
             public FrameSize frameSize() {
@@ -117,12 +129,17 @@ public interface SlideshowGraphics {
             }
 
             @Override
-            public void drawCenteredText(final Component text, final int x, final int y, final int color) {
+            public void drawText(final FormattedCharSequence text, final int x, final int y, final int color, final int scale) {
                 poseStack.pushPose();
-                poseStack.scale(1.0f / 16.0f, -1.0f / 16.0f, 1.0f / 16.0f);
+                poseStack.translate(
+                        ((float) x / frameSize.width() - 0.5f) * worldWidth,
+                        (0.5f - (float) y / frameSize.height()) * worldHeight,
+                        0.0f
+                );
+                poseStack.scale(scale * worldWidth / frameSize.width(), -scale * worldHeight / frameSize.height(), 1.0f / 16.0f);
                 font.drawInBatch(text,
-                        -worldWidth / 2.0f + (float) x / frameSize.width() * worldWidth - font.width(text) / 2.0f,
-                        -worldHeight / 2.0f + (float) y / frameSize.height() * worldHeight - font.lineHeight / 2.0f,
+                        0.0f,
+                        0.0f,
                         color,
                         true,
                         poseStack.last().pose(),
@@ -131,8 +148,13 @@ public interface SlideshowGraphics {
                         0,
                         lightCoords
                 );
-                poseStack.translate(0.0f, 0.0f, Z_OFFSET);
                 poseStack.popPose();
+                poseStack.translate(0.0f, 0.0f, Z_OFFSET);
+            }
+
+            @Override
+            public Font font() {
+                return font;
             }
         };
     }
@@ -153,5 +175,12 @@ public interface SlideshowGraphics {
 
     void blit(ResourceLocation location, int x, int y, int width, int height, int color);
 
-    void drawCenteredText(Component text, int x, int y, int color);
+    void drawText(FormattedCharSequence text, int x, int y, int color, int scale);
+
+    default void drawCenteredText(final Component text, final int x, final int y, final int color, final int scale) {
+        final FormattedCharSequence charSequence = text.getVisualOrderText();
+        drawText(charSequence, x - font().width(charSequence) * scale / 2, y - font().lineHeight * scale / 2, color, scale);
+    }
+
+    Font font();
 }

@@ -3,8 +3,6 @@ package org.lovetropics.multimedia.mod.slideshow;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.util.StringRepresentable;
 import org.lovetropics.multimedia.mod.MediaFile;
 
@@ -46,14 +44,36 @@ public sealed interface SlideContent {
         }
     }
 
-    record Text(
-            Component text,
+    record Image(
+            MediaFile file,
+            SlideDecorations decorations,
             Duration duration
     ) implements SlideContent {
-        public static final MapCodec<Text> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
-                ComponentSerialization.CODEC.fieldOf("text").forGetter(Text::text),
-                Slide.SECONDS_CODEC.fieldOf("duration").forGetter(Text::duration)
-        ).apply(i, Text::new));
+        public static final MapCodec<Image> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+                MediaFile.CODEC.fieldOf("file").forGetter(Image::file),
+                SlideDecorations.MAP_CODEC.forGetter(Image::decorations),
+                Slide.SECONDS_CODEC.fieldOf("duration").forGetter(Image::duration)
+        ).apply(i, Image::new));
+
+        @Override
+        public Stream<MediaFile> files() {
+            return Stream.of(file);
+        }
+
+        @Override
+        public Type type() {
+            return Type.IMAGE;
+        }
+    }
+
+    record Blank(
+            SlideDecorations decorations,
+            Duration duration
+    ) implements SlideContent {
+        public static final MapCodec<Blank> MAP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+                SlideDecorations.MAP_CODEC.forGetter(Blank::decorations),
+                Slide.SECONDS_CODEC.fieldOf("duration").forGetter(Blank::duration)
+        ).apply(i, Blank::new));
 
         @Override
         public Stream<MediaFile> files() {
@@ -62,13 +82,15 @@ public sealed interface SlideContent {
 
         @Override
         public Type type() {
-            return Type.TEXT;
+            return Type.BLANK;
         }
     }
 
     enum Type implements StringRepresentable {
         VIDEO("video", Video.MAP_CODEC),
-        TEXT("text", Text.MAP_CODEC);;
+        IMAGE("image", Image.MAP_CODEC),
+        BLANK("blank", Blank.MAP_CODEC),
+        ;
 
         public static final Codec<Type> CODEC = StringRepresentable.fromEnum(Type::values);
 

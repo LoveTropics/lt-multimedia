@@ -1,12 +1,16 @@
 package org.lovetropics.multimedia.mod.client.cache;
 
+import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.logging.LogUtils;
 import net.minecraft.FileUtil;
 import net.minecraft.Util;
 import net.minecraft.util.thread.ConsecutiveExecutor;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpStatus;
+import org.lovetropics.multimedia.MultimediaReader;
 import org.lovetropics.multimedia.mod.MediaFile;
+import org.lwjgl.BufferUtils;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -14,6 +18,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -145,6 +150,27 @@ public class MediaFileCache {
             return CompletableFuture.completedFuture(null);
         }
         return getOrDownload(file.uri()).thenCompose(CachedFile::awaitDownload);
+    }
+
+    public MultimediaReader openMultimediaReader(final MediaFile file) throws IOException {
+        final SeekableByteChannel channel = openChannel(file);
+        try {
+            return MultimediaReader.open(channel);
+        } catch (final IOException e) {
+            IOUtils.closeQuietly(channel);
+            throw e;
+        }
+    }
+
+    public NativeImage loadImage(final MediaFile file) throws IOException {
+        try (final SeekableByteChannel channel = openChannel(file)) {
+            final ByteBuffer buffer = BufferUtils.createByteBuffer(Math.toIntExact(channel.size()));
+            while (buffer.hasRemaining()) {
+                channel.read(buffer);
+            }
+            buffer.flip();
+            return NativeImage.read(buffer);
+        }
     }
 
     public SeekableByteChannel openChannel(final MediaFile file) throws IOException {
