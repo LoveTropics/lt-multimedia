@@ -5,6 +5,7 @@ plugins {
     id 'java-library'
     id 'io.github.goooler.shadow' version '8.1.8'
     id 'net.neoforged.moddev' version '2.0.107'
+    id 'maven-publish'
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
@@ -122,5 +123,27 @@ idea {
     module {
         downloadSources = true
         downloadJavadoc = true
+    }
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+        }
+    }
+
+    repositories {
+        if (env.MAVEN_URL) {
+            maven {
+                credentials {
+                    username env.MAVEN_USERNAME
+                    password env.MAVEN_PASSWORD
+                }
+                url env.MAVEN_URL
+            }
+        } else {
+            mavenLocal()
+        }
     }
 }
