@@ -49,7 +49,7 @@ impl io::Read for JReadableByteChannel {
         };
 
         match result {
-            Ok(read_bytes) if read_bytes >= 0 => Ok(read_bytes as usize),
+            Ok(read_bytes) if read_bytes >= 0 => Ok(usize::try_from(read_bytes).unwrap()),
             Ok(_) => Ok(0),
             Err(jni::errors::Error::JavaException) => {
                 Err(io::Error::other(jni::errors::Error::JavaException))
@@ -102,10 +102,12 @@ impl JSeekableByteChannel {
 
         let position = env
             .call_method(&inner.object, "position", "()J", &[])
-            .map(|v| v.j().unwrap())? as u64;
+            .map(|v| v.j().unwrap())?;
+        let position = u64::try_from(position).unwrap();
         let size = env
             .call_method(&inner.object, "size", "()J", &[])
-            .map(|v| v.j().unwrap())? as u64;
+            .map(|v| v.j().unwrap())?;
+        let size = u64::try_from(size).unwrap();
 
         Ok(JSeekableByteChannel {
             inner,
@@ -120,7 +122,7 @@ impl io::Read for JSeekableByteChannel {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let result = self.inner.read(buf);
         if let Ok(read_bytes) = result {
-            self.position += read_bytes as u64;
+            self.position += u64::try_from(read_bytes).unwrap();
         }
         result
     }
@@ -132,9 +134,9 @@ impl io::Seek for JSeekableByteChannel {
 
         let new_position = match pos {
             SeekFrom::Start(offset) => offset,
-            SeekFrom::End(offset) => u64::try_from(self.size as i64 + offset)
+            SeekFrom::End(offset) => u64::try_from(i64::try_from(self.size).unwrap() + offset)
                 .map_err(|_| io::Error::other("Cannot seek before byte 0"))?,
-            SeekFrom::Current(offset) => u64::try_from(self.position as i64 + offset)
+            SeekFrom::Current(offset) => u64::try_from(i64::try_from(self.position).unwrap() + offset)
                 .map_err(|_| io::Error::other("Cannot seek before byte 0"))?,
         };
 
@@ -149,7 +151,7 @@ impl io::Seek for JSeekableByteChannel {
                 self.set_position_method,
                 ReturnType::Object,
                 &[jvalue {
-                    j: new_position as jlong,
+                    j: jlong::try_from(new_position).unwrap(),
                 }],
             )
         };

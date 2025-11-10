@@ -21,7 +21,7 @@ impl VideoFrameFormat {
             pixel,
             width,
             height,
-            stride: pixel.descriptor().map(|desc| width as usize * desc.nb_components() as usize),
+            stride: pixel.descriptor().map(|desc| usize::try_from(width).unwrap() * usize::try_from(desc.nb_components()).unwrap()),
         }
     }
 
@@ -286,7 +286,7 @@ fn copy_to_buf(src: &frame::Video, dst: &mut [u8], dst_format: VideoFrameFormat)
     if src_stride == dst_stride {
         dst[0..src_buf.len()].copy_from_slice(src_buf);
     } else {
-        for y in 0..dst_format.height as usize {
+        for y in 0..usize::try_from(dst_format.height).unwrap() {
             let dst_start = y * dst_stride;
             let dst_end = dst_start + dst_stride;
             let src_start = y * src_stride;

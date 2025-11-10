@@ -251,10 +251,10 @@ unsafe extern "C" fn io_read<R: io::Read>(
     buf_size: c_int,
 ) -> c_int {
     let read_state = unsafe { &mut *(opaque as *mut ReadState<R>) };
-    let buf = unsafe { slice::from_raw_parts_mut(buf, buf_size as usize) };
+    let buf = unsafe { slice::from_raw_parts_mut(buf, usize::try_from(buf_size).unwrap()) };
     match read_state.read.read(buf) {
         Ok(0) => ffmpeg::Error::Eof.into(),
-        Ok(bytes) => bytes as c_int,
+        Ok(bytes) => c_int::try_from(bytes).unwrap(),
         Err(err) => {
             read_state.store_error(err);
             ffmpeg::Error::External.into()
@@ -272,16 +272,16 @@ unsafe extern "C" fn io_seek<R: io::Seek>(
     let result = match whence {
         ffmpeg::ffi::AVSEEK_SIZE => stream_size(&mut read_state.read),
         ffmpeg::ffi::SEEK_CUR => read_state.read.seek(io::SeekFrom::Current(offset)),
-        ffmpeg::ffi::SEEK_SET => read_state.read.seek(io::SeekFrom::Start(offset as u64)),
+        ffmpeg::ffi::SEEK_SET => read_state.read.seek(io::SeekFrom::Start(u64::try_from(offset).unwrap())),
         ffmpeg::ffi::SEEK_END => read_state.read.seek(io::SeekFrom::End(offset)),
         _ => panic!("Unknown whence: {}", whence),
     };
 
     match result {
-        Ok(result) => result as i64,
+        Ok(result) => i64::try_from(result).unwrap(),
         Err(err) => {
             read_state.store_error(err);
-            <ffmpeg::Error as Into<c_int>>::into(ffmpeg::Error::External) as i64
+            i64::try_from(c_int::from(ffmpeg::Error::External)).unwrap()
         }
     }
 }

@@ -200,7 +200,7 @@ pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_g
     decoder: jlong,
 ) -> jint {
     let decoder: &mut JFrameDecoder<VideoDecoder> = unsafe { from_java_ptr(&env, decoder) };
-    decoder.format().width() as jint
+    jint::try_from(decoder.format().width()).unwrap()
 }
 
 #[unsafe(no_mangle)]
@@ -211,7 +211,7 @@ pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_g
     decoder: jlong,
 ) -> jint {
     let decoder: &mut JFrameDecoder<VideoDecoder> = unsafe { from_java_ptr(&env, decoder) };
-    decoder.format().height() as jint
+    jint::try_from(decoder.format().height()).unwrap()
 }
 
 #[unsafe(no_mangle)]
@@ -276,9 +276,9 @@ pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_u
 ) -> jint {
     let frame: Box<VideoFrame> = unsafe { take_java_ptr(frame) };
     let output = unsafe { as_slice_with_offset_mut(&env, &output, offset) };
-    let format = VideoFrameFormat::new(format::Pixel::RGBA, width as u32, height as u32);
+    let format = VideoFrameFormat::new(format::Pixel::RGBA, u32::try_from(width).unwrap(), u32::try_from(height).unwrap());
     let result = frame.unpack_pixels(format, output);
-    handle_result(env, result, 0) as jint
+    jint::try_from(handle_result(env, result, 0)).unwrap()
 }
 
 #[unsafe(no_mangle)]
@@ -315,7 +315,7 @@ pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_o
     let format = AudioFrameFormat::new(
         sample_format,
         if stereo != 0 { ChannelLayout::STEREO } else { ChannelLayout::MONO },
-        sample_rate as u32
+        u32::try_from(sample_rate).unwrap()
     );
 
     let decoder = reader.open_audio_decoder(format).map(|decoder|
@@ -381,7 +381,7 @@ pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_g
     frame: jlong,
 ) -> jint {
     let frame: &mut AudioFrame = unsafe { from_java_ptr(&env, frame) };
-    frame.samples() as jint
+    jint::try_from(frame.samples()).unwrap()
 }
 
 #[unsafe(no_mangle)]
@@ -392,7 +392,7 @@ pub unsafe extern "system" fn Java_org_lovetropics_multimedia_MultimediaNative_g
     frame: jlong,
 ) -> jint {
     let frame: &mut AudioFrame = unsafe { from_java_ptr(&env, frame) };
-    frame.bytes() as jint
+    jint::try_from(frame.bytes()).unwrap()
 }
 
 #[unsafe(no_mangle)]
@@ -438,8 +438,9 @@ fn into_java_ptr<T>(value: T) -> jlong {
 }
 
 unsafe fn as_slice_with_offset_mut<'a>(env: &'a JNIEnv<'a>, buffer: &'a JByteBuffer, offset: jint) -> &'a mut [u8] {
+    let offset = usize::try_from(offset).unwrap();
     let buffer = unsafe { as_slice_mut(&env, &buffer) };
-    &mut buffer[offset as usize..]
+    &mut buffer[offset..]
 }
 
 unsafe fn as_slice_mut<'a>(env: &'a JNIEnv<'a>, buffer: &'a JByteBuffer) -> &'a mut [u8] {

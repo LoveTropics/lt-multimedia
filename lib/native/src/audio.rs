@@ -84,7 +84,7 @@ impl AudioDecoder {
             resampler,
             src_frame: frame::Audio::empty(),
             src_time_base,
-            dst_sample_duration: ffmpeg::Rational(1, dst_format.sample_rate as i32),
+            dst_sample_duration: ffmpeg::Rational(1, i32::try_from(dst_format.sample_rate).unwrap()),
             discard_up_to: Duration::ZERO,
             dst_base_timestamp: None,
             current_dst_samples: 0,
@@ -139,8 +139,8 @@ impl AudioDecoder {
     fn handle_resample_result(&mut self, result: Result<Option<software::resampling::Delay>, ffmpeg::Error>, dst_frame: frame::Audio) -> Option<Result<AudioFrame>> {
         match result {
             Ok(_) => {
-                let present_time = self.dst_base_timestamp.unwrap() + time::to_duration(self.current_dst_samples as i64, self.dst_sample_duration);
-                self.current_dst_samples += dst_frame.samples() as u64;
+                let present_time = self.dst_base_timestamp.unwrap() + time::to_duration(i64::try_from(self.current_dst_samples).unwrap(), self.dst_sample_duration);
+                self.current_dst_samples += u64::try_from(dst_frame.samples()).unwrap();
                 Some(Ok(AudioFrame {
                     resources: self.resources.clone(),
                     frame: Some(dst_frame),
@@ -224,7 +224,7 @@ impl AudioFrame {
     #[inline]
     pub fn bytes(&self) -> usize {
         let frame = self.frame();
-        frame.samples() * frame.channels() as usize * frame.format().bytes()
+        frame.samples() * usize::from(frame.channels()) * frame.format().bytes()
     }
 
     #[inline]
