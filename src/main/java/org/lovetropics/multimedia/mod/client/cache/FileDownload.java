@@ -8,6 +8,7 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
@@ -128,11 +129,14 @@ import java.util.concurrent.locks.ReentrantLock;
                             if (!writerOpen) {
                                 return -1;
                             }
-                            canRead.awaitUninterruptibly();
+                            canRead.await();
                         } else {
                             return readBytes;
                         }
                     }
+                } catch (final InterruptedException e) {
+                    close();
+                    throw new ClosedByInterruptException();
                 } finally {
                     lock.unlock();
                 }

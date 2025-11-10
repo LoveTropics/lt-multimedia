@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.nio.channels.ClosedByInterruptException;
 import java.util.ArrayDeque;
 import java.util.Objects;
 import java.util.Queue;
@@ -95,7 +96,7 @@ import java.util.concurrent.locks.ReentrantLock;
                     markEofAndSleep();
                 }
             }
-        } catch (final InterruptedException ignored) {
+        } catch (final InterruptedException | ClosedByInterruptException ignored) {
             // Closed from the main thread, stop immediately
         } catch (final IOException e) {
             LOGGER.error("Failed to read packet from stream", e);
