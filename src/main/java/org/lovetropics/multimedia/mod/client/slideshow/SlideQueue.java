@@ -76,7 +76,7 @@ public class SlideQueue {
                 return i;
             }
         }
-        return slides.size() - 1;
+        return slides.size();
     }
 
     public double getSlideStartTime(final int index) {
