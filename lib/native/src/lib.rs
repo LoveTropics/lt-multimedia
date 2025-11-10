@@ -140,18 +140,21 @@ impl<R> MultimediaReader<R> {
     }
 
     pub fn read_packet(&mut self) -> Option<Result<MultimediaPacket>> {
+        // Not using PacketIter, as it swallows genuine errors
+        let mut packet = ffmpeg::Packet::empty();
         loop {
-            match self.input.packets().next() {
-                Some((stream, packet)) => {
-                    if Some(stream.index()) == self.video_stream_index {
+            match packet.read(&mut self.input) {
+                Ok(_) => {
+                    let stream = Some(packet.stream());
+                    if stream == self.video_stream_index {
                         let flush = mem::replace(&mut self.flush_video, None);
                         break Some(Ok(MultimediaPacket::Video(VideoPacket::new(packet, flush))));
-                    } else if Some(stream.index()) == self.audio_stream_index {
+                    } else if stream == self.audio_stream_index {
                         let flush = mem::replace(&mut self.flush_audio, None);
                         break Some(Ok(MultimediaPacket::Audio(AudioPacket::new(packet, flush))));
                     }
-                }
-                None => {
+                },
+                Err(ffmpeg::Error::Eof) => {
                     break if let Some(err) = self.read_state.take_error() {
                         Some(Err(err.into()))
                     } else if !self.video_eof {
@@ -164,6 +167,7 @@ impl<R> MultimediaReader<R> {
                         None
                     }
                 },
+                Err(err) => break Some(Err(self.read_state.map_error(err))),
             }
         }
     }
