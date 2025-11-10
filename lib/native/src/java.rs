@@ -14,29 +14,32 @@ fn handle_result<R>(
     result: Result<R, Error>,
     default: R
 ) -> R {
-    match result {
-        Ok(result) => result,
-        Err(Error::Io(err)) => {
-            match env.exception_check() {
-                // A Java exception has already been thrown, no action needed
-                Ok(true) => {},
-                _ => {
-                    env.throw_new(
-                        "java/io/IOException",
-                        format!("{:?}", err)
-                    ).expect("Failed to throw exception");
-                }
-            }
-            default
+    let err = match result {
+        Ok(result) => return result,
+        Err(err) => err,
+    };
+
+    if let Ok(true) = env.exception_check() {
+        // A Java exception has already been thrown, no action needed
+        return default;
+    }
+
+    match err {
+        Error::Io(err) => {
+            env.throw_new(
+                "java/io/IOException",
+                format!("{:?}", err),
+            ).expect("Failed to throw exception");
         },
-        Err(err) => {
+        err => {
             env.throw_new(
                 "org/lovetropics/multimedia/DecoderException",
                 format!("{:?}", err)
             ).expect("Failed to throw exception");
-            default
         }
     }
+
+    default
 }
 
 #[unsafe(no_mangle)]
