@@ -26,7 +26,8 @@ pub fn frame_present_time(frame: &ffmpeg::Frame, time_base: ffmpeg::Rational) ->
         .timestamp()
         .or(frame.pts())
         .unwrap_or(frame.packet().dts);
-    to_duration(present_time, time_base)
+    // Presentation time can be negative, somehow - just fudge it
+    to_duration(present_time.max(0), time_base)
 }
 
 pub fn frame_present_duration(
