@@ -1,7 +1,9 @@
 package org.lovetropics.multimedia.mod.command;
 
+import com.lovetropics.lib.slideshow.SlideshowInstanceHandle;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
@@ -11,19 +13,15 @@ import net.minecraft.world.entity.Entity;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
-import org.lovetropics.multimedia.mod.MediaFile;
 import org.lovetropics.multimedia.mod.MultimediaMod;
 import org.lovetropics.multimedia.mod.entity.ScreenEntity;
-import org.lovetropics.multimedia.mod.network.ClientboundClearSlideshowPacket;
-import org.lovetropics.multimedia.mod.network.ClientboundPreloadMediaPacket;
-import org.lovetropics.multimedia.mod.network.ClientboundSeekSlideshowPacket;
-import org.lovetropics.multimedia.mod.network.ClientboundStartSlideshowPacket;
 import org.lovetropics.multimedia.mod.slideshow.SlideshowHolder;
-import org.lovetropics.multimedia.mod.slideshow.SlideshowInstanceId;
 import org.lovetropics.multimedia.mod.slideshow.Slideshows;
+import org.lovetropics.multimedia.mod.slideshow.instance.ServerFullScreenSlideshow;
 
 import java.util.Collection;
-import java.util.List;
+import java.util.Set;
+import java.util.function.Consumer;
 
 import static com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg;
 import static com.mojang.brigadier.arguments.DoubleArgumentType.getDouble;
@@ -82,7 +80,9 @@ public class SlideshowCommand {
         }
         for (final Entity target : targets) {
             if (target instanceof final ServerPlayer player) {
-                player.connection.send(new ClientboundStartSlideshowPacket(SlideshowInstanceId.FULL_SCREEN, slideshow.value(), 0.0, false));
+                final ServerFullScreenSlideshow instance = MultimediaMod.slideshowManager().open(slideshow);
+                instance.play();
+                instance.addPlayer(player);
             } else if (target instanceof final ScreenEntity screen) {
                 screen.setSlideshow(slideshow);
             }
@@ -92,37 +92,35 @@ public class SlideshowCommand {
 
     private static int clearSlideshow(final Collection<? extends Entity> targets) {
         for (final Entity target : targets) {
-            if (target instanceof final ServerPlayer player) {
-                player.connection.send(new ClientboundClearSlideshowPacket(SlideshowInstanceId.FULL_SCREEN));
-            } else if (target instanceof final ScreenEntity screen) {
-                screen.setSlideshow(null);
-            }
+            MultimediaMod.slideshowManager().clear(target);
         }
         return targets.size();
     }
 
     private static int setSlideshowPaused(final Collection<? extends Entity> targets, final boolean paused) {
-        for (final Entity target : targets) {
-            if (target instanceof final ServerPlayer player) {
-                // TODO: Store full-screen slideshow states server-side, preserve time
-                player.connection.send(new ClientboundSeekSlideshowPacket(SlideshowInstanceId.FULL_SCREEN, 0.0, paused));
-            } else if (target instanceof final ScreenEntity screen) {
-                screen.setPaused(paused);
-            }
-        }
-        return targets.size();
+        return applyToInstances(targets, instance ->
+                instance.setPaused(paused)
+        );
     }
 
     private static int seekSlideshow(final Collection<? extends Entity> targets, final double seconds) {
+        return applyToInstances(targets, instance ->
+                instance.seekTo(seconds, instance.isPaused())
+        );
+    }
+
+    private static int applyToInstances(final Collection<? extends Entity> targets, final Consumer<SlideshowInstanceHandle> consumer) {
+        final Set<SlideshowInstanceHandle> instances = new ReferenceOpenHashSet<>();
         for (final Entity target : targets) {
-            if (target instanceof final ServerPlayer player) {
-                // TODO: Store full-screen slideshow states server-side, preserve paused
-                player.connection.send(new ClientboundSeekSlideshowPacket(SlideshowInstanceId.FULL_SCREEN, seconds, false));
-            } else if (target instanceof final ScreenEntity screen) {
-                screen.seekSlideshow(seconds);
+            final SlideshowInstanceHandle instance = MultimediaMod.slideshowManager().byEntity(target);
+            if (instance != null) {
+                instances.add(instance);
             }
         }
-        return targets.size();
+        for (final SlideshowInstanceHandle instance : instances) {
+            consumer.accept(instance);
+        }
+        return instances.size();
     }
 
     private static int preloadSlideshow(final Collection<? extends Entity> targets, final ResourceLocation id) throws CommandSyntaxException {
@@ -130,10 +128,9 @@ public class SlideshowCommand {
         if (slideshow == null) {
             throw NO_SLIDESHOW.create(id);
         }
-        final List<MediaFile> files = slideshow.value().files().toList();
         for (final Entity target : targets) {
             if (target instanceof final ServerPlayer player) {
-                player.connection.send(new ClientboundPreloadMediaPacket(files));
+                MultimediaMod.slideshowManager().preload(player, slideshow);
             }
         }
         return targets.size();

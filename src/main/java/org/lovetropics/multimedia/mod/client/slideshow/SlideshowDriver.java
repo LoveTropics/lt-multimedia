@@ -55,12 +55,7 @@ public class SlideshowDriver implements AutoCloseable {
     }
 
     public void seekTo(final double time, final boolean paused) {
-        clock.setElapsedTime(time);
-        if (paused) {
-            clock.pause();
-        } else {
-            clock.play();
-        }
+        clock.set(time, paused);
 
         if (state != null && state.trySeek(clock)) {
             return;

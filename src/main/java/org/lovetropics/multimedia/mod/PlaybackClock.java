@@ -26,6 +26,14 @@ public class PlaybackClock {
         }
     }
 
+    public synchronized void setPaused(final boolean paused) {
+        if (paused) {
+            pause();
+        } else {
+            play();
+        }
+    }
+
     public synchronized void setElapsedTime(final double elapsedTime) {
         final boolean wasPaused = isPaused();
         final long currentTimestamp = Util.getNanos();
@@ -33,6 +41,11 @@ public class PlaybackClock {
         if (wasPaused) {
             pausedAt = currentTimestamp;
         }
+    }
+
+    public synchronized void set(final double elapsedTime, final boolean paused) {
+        setElapsedTime(elapsedTime);
+        setPaused(paused);
     }
 
     private long getCurrentTimestamp() {

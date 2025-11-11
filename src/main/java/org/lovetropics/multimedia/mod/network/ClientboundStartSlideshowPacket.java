@@ -6,16 +6,15 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import org.lovetropics.multimedia.mod.MultimediaMod;
 import org.lovetropics.multimedia.mod.slideshow.Slideshow;
-import org.lovetropics.multimedia.mod.slideshow.SlideshowInstanceId;
 
 public record ClientboundStartSlideshowPacket(
-        SlideshowInstanceId id,
+        SlideshowNetworkId id,
         Slideshow slideshow,
         double time,
         boolean paused
 ) implements CustomPacketPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundStartSlideshowPacket> STREAM_CODEC = StreamCodec.composite(
-            SlideshowInstanceId.STREAM_CODEC, ClientboundStartSlideshowPacket::id,
+            SlideshowNetworkId.STREAM_CODEC, ClientboundStartSlideshowPacket::id,
             Slideshow.STREAM_CODEC, ClientboundStartSlideshowPacket::slideshow,
             ByteBufCodecs.DOUBLE, ClientboundStartSlideshowPacket::time,
             ByteBufCodecs.BOOL, ClientboundStartSlideshowPacket::paused,

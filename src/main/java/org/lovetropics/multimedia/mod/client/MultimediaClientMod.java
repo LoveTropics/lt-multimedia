@@ -13,7 +13,7 @@ import org.lovetropics.multimedia.mod.MultimediaMod;
 import org.lovetropics.multimedia.mod.client.cache.MediaFileCache;
 import org.lovetropics.multimedia.mod.client.config.MultimediaClientConfig;
 import org.lovetropics.multimedia.mod.client.entity.render.ScreenRenderer;
-import org.lovetropics.multimedia.mod.client.slideshow.SlideshowManager;
+import org.lovetropics.multimedia.mod.client.slideshow.ClientSlideshowManager;
 import org.lovetropics.multimedia.mod.network.ClientboundClearSlideshowPacket;
 import org.lovetropics.multimedia.mod.network.ClientboundPreloadMediaPacket;
 import org.lovetropics.multimedia.mod.network.ClientboundSeekSlideshowPacket;
@@ -27,7 +27,7 @@ public class MultimediaClientMod {
     @Nullable
     private static MediaFileCache mediaCache;
     @Nullable
-    private static SlideshowManager slideshowManager;
+    private static ClientSlideshowManager slideshowManager;
 
     public MultimediaClientMod(final IEventBus modBus, final ModContainer modContainer) {
         MultimediaClientConfig.register(modContainer);
@@ -36,7 +36,7 @@ public class MultimediaClientMod {
                 FMLPaths.MODSDIR.get().resolve("lovetropics").resolve("media_cache"),
                 "LoveTropics Multimedia / " + modContainer.getModInfo().getVersion()
         );
-        slideshowManager = new SlideshowManager(mediaCache);
+        slideshowManager = new ClientSlideshowManager(mediaCache);
 
         modBus.addListener(slideshowManager::registerOverlays);
         modBus.addListener(this::registerEntityRenderers);
@@ -48,7 +48,7 @@ public class MultimediaClientMod {
         return Objects.requireNonNull(mediaCache, "Media cache not initialized");
     }
 
-    public static SlideshowManager slideshowManager() {
+    public static ClientSlideshowManager slideshowManager() {
         return Objects.requireNonNull(slideshowManager, "Slideshow manager not initialized");
     }
 
@@ -58,7 +58,7 @@ public class MultimediaClientMod {
 
     public void registerClientHandlers(final RegisterClientPayloadHandlersEvent event) {
         final MediaFileCache mediaCache = mediaCache();
-        final SlideshowManager slideshowManager = slideshowManager();
+        final ClientSlideshowManager slideshowManager = slideshowManager();
         event.register(ClientboundPreloadMediaPacket.TYPE, (packet, context) -> {
             for (final MediaFile file : packet.files()) {
                 mediaCache.ensureDownloaded(file);

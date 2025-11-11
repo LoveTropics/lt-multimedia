@@ -9,6 +9,7 @@ import net.minecraft.util.ExtraCodecs;
 import org.lovetropics.multimedia.mod.MediaFile;
 import org.lovetropics.multimedia.mod.client.cache.MediaFileCache;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -27,6 +28,14 @@ public record Slideshow(
         return slides.stream()
                 .flatMap(slide -> slide.content().files())
                 .distinct();
+    }
+
+    public Duration duration() {
+        Duration duration = Duration.ZERO;
+        for (final Slide slide : slides) {
+            duration = duration.plus(slide.duration());
+        }
+        return duration;
     }
 
     public void ensureDownloaded(final MediaFileCache mediaCache) {

@@ -21,4 +21,8 @@ public record Slide(
             SlideTransition.CODEC.optionalFieldOf("transition_in").forGetter(Slide::transitionIn),
             SlideTransition.CODEC.optionalFieldOf("transition_out").forGetter(Slide::transitionOut)
     ).apply(i, Slide::new));
+
+    public Duration duration() {
+        return content.duration();
+    }
 }

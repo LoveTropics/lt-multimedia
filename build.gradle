@@ -67,6 +67,16 @@ configurations {
     additionalRuntimeClasspath.extendsFrom shadeNative
 }
 
+repositories {
+    maven {
+        url = 'https://maven.gegy.dev/releases'
+        content {
+            includeGroup 'org.lovetropics'
+        }
+    }
+    mavenLocal()
+}
+
 dependencies {
     shade project(':lib')
     if (env.CROSS_PLATFORM_BUILD) {
@@ -77,6 +87,8 @@ dependencies {
     } else {
         shadeNative project(':lib:native')
     }
+
+    jarJar(implementation("org.lovetropics:LTLib:$ltlib_version"))
 }
 
 tasks.named('jar', Jar).configure {
@@ -129,7 +141,7 @@ idea {
 publishing {
     publications {
         maven(MavenPublication) {
-            from components.java
+            artifact shadowJar
         }
     }
 

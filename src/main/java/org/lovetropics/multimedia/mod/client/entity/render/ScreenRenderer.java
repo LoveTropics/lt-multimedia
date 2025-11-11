@@ -10,13 +10,12 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.util.CommonColors;
 import org.lovetropics.multimedia.mod.client.MultimediaClientMod;
 import org.lovetropics.multimedia.mod.client.entity.ScreenClientState;
-import org.lovetropics.multimedia.mod.client.slideshow.SlideshowDriver;
 import org.lovetropics.multimedia.mod.client.slideshow.SlideshowGraphics;
-import org.lovetropics.multimedia.mod.client.slideshow.SlideshowManager;
+import org.lovetropics.multimedia.mod.client.slideshow.ClientSlideshowManager;
 import org.lovetropics.multimedia.mod.entity.ScreenEntity;
 
 public class ScreenRenderer extends EntityRenderer<ScreenEntity, ScreenRenderState> {
-    private final SlideshowManager slideshowManager;
+    private final ClientSlideshowManager slideshowManager;
     private final Font font;
 
     public ScreenRenderer(final EntityRendererProvider.Context context) {

@@ -1,5 +1,6 @@
 package org.lovetropics.multimedia.mod.entity;
 
+import com.lovetropics.lib.slideshow.SlideshowInstanceHandle;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -25,8 +26,8 @@ import org.lovetropics.multimedia.mod.client.playback.AudioWorldSource;
 import org.lovetropics.multimedia.mod.network.ClientboundClearSlideshowPacket;
 import org.lovetropics.multimedia.mod.network.ClientboundSeekSlideshowPacket;
 import org.lovetropics.multimedia.mod.network.ClientboundStartSlideshowPacket;
+import org.lovetropics.multimedia.mod.network.SlideshowNetworkId;
 import org.lovetropics.multimedia.mod.slideshow.SlideshowHolder;
-import org.lovetropics.multimedia.mod.slideshow.SlideshowInstanceId;
 import org.lovetropics.multimedia.mod.slideshow.Slideshows;
 
 public class ScreenEntity extends Entity {
@@ -49,16 +50,15 @@ public class ScreenEntity extends Entity {
         super(type, level);
     }
 
-    private SlideshowInstanceId instanceId() {
-        return SlideshowInstanceId.of(this);
+    private SlideshowNetworkId networkId() {
+        return SlideshowNetworkId.of(this);
     }
 
     @Override
     public void startSeenByPlayer(final ServerPlayer player) {
         super.startSeenByPlayer(player);
         if (slideshow != null) {
-            final double time = clock.getElapsedTime();
-            player.connection.send(new ClientboundStartSlideshowPacket(instanceId(), slideshow.value(), time, clock.isPaused()));
+            player.connection.send(new ClientboundStartSlideshowPacket(networkId(), slideshow.value(), clock.getElapsedTime(), clock.isPaused()));
         }
     }
 
@@ -69,34 +69,70 @@ public class ScreenEntity extends Entity {
         builder.define(DATA_AUDIO_RADIUS, DEFAULT_AUDIO_RADIUS);
     }
 
+    public @Nullable SlideshowInstanceHandle asHandle() {
+        if (slideshow == null) {
+            return null;
+        }
+        final double totalTime = slideshow.value().duration().toMillis() / 1000.0;
+        return new SlideshowInstanceHandle() {
+            @Override
+            public void addPlayer(final ServerPlayer player) {
+            }
+
+            @Override
+            public void removePlayer(final ServerPlayer player) {
+            }
+
+            @Override
+            public void seekTo(final double time, final boolean paused) {
+                ScreenEntity.this.seekTo(time, paused);
+            }
+
+            @Override
+            public double currentTime() {
+                return clock.getElapsedTime();
+            }
+
+            @Override
+            public double totalTime() {
+                return totalTime;
+            }
+
+            @Override
+            public boolean isPaused() {
+                return clock.isPaused();
+            }
+
+            @Override
+            public void close() {
+                setSlideshow(null);
+            }
+        };
+    }
+
     public void setSlideshow(@Nullable final SlideshowHolder slideshow) {
-        clock.setElapsedTime(0.0);
-        clock.play();
+        clock.set(0.0, false);
         this.slideshow = slideshow;
         final CustomPacketPayload packet;
         if (slideshow != null) {
-            packet = new ClientboundStartSlideshowPacket(instanceId(), slideshow.value(), 0.0, clock.isPaused());
+            packet = new ClientboundStartSlideshowPacket(networkId(), slideshow.value(), 0.0, clock.isPaused());
         } else {
-            packet = new ClientboundClearSlideshowPacket(instanceId());
+            packet = new ClientboundClearSlideshowPacket(networkId());
         }
         PacketDistributor.sendToPlayersTrackingEntity(this, packet);
     }
 
-    public void seekSlideshow(final double time) {
+    private void loadSlideshow(@Nullable final SlideshowHolder slideshow, final double time, final boolean paused) {
+        this.slideshow = slideshow;
         if (slideshow != null) {
-            clock.setElapsedTime(time);
-            PacketDistributor.sendToPlayersTrackingEntity(this, new ClientboundSeekSlideshowPacket(instanceId(), time, clock.isPaused()));
+            clock.set(time, paused);
         }
     }
 
-    public void setPaused(final boolean paused) {
+    private void seekTo(final double time, final boolean paused) {
         if (slideshow != null) {
-            if (paused) {
-                clock.pause();
-            } else {
-                clock.play();
-            }
-            PacketDistributor.sendToPlayersTrackingEntity(this, new ClientboundSeekSlideshowPacket(instanceId(), clock.getElapsedTime(), paused));
+            clock.set(time, paused);
+            PacketDistributor.sendToPlayersTrackingEntity(this, new ClientboundSeekSlideshowPacket(networkId(), time, paused));
         }
     }
 
@@ -181,17 +217,13 @@ public class ScreenEntity extends Entity {
         entityData.set(DATA_WIDTH, input.getFloatOr("width", DEFAULT_WIDTH));
         entityData.set(DATA_HEIGHT, input.getFloatOr("height", DEFAULT_HEIGHT));
         entityData.set(DATA_AUDIO_RADIUS, input.getFloatOr("audio_radius", DEFAULT_AUDIO_RADIUS));
-        setSlideshow(input.read("slideshow", ResourceLocation.CODEC)
-                .map(Slideshows.REGISTRY::get)
-                .orElse(null));
-        if (slideshow != null) {
-            clock.setElapsedTime(input.getDoubleOr("time", 0.0));
-            if (input.getBooleanOr("paused", false)) {
-                clock.pause();
-            } else {
-                clock.play();
-            }
-        }
+        loadSlideshow(
+                input.read("slideshow", ResourceLocation.CODEC)
+                        .map(Slideshows.REGISTRY::get)
+                        .orElse(null),
+                input.getDoubleOr("time", 0.0),
+                input.getBooleanOr("paused", false)
+        );
     }
 
     @Override

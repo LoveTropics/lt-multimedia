@@ -21,11 +21,11 @@ import org.lovetropics.multimedia.mod.client.entity.ScreenClientState;
 import org.lovetropics.multimedia.mod.client.playback.PlaybackSyncType;
 import org.lovetropics.multimedia.mod.entity.ScreenEntity;
 import org.lovetropics.multimedia.mod.slideshow.Slideshow;
-import org.lovetropics.multimedia.mod.slideshow.SlideshowInstanceId;
+import org.lovetropics.multimedia.mod.network.SlideshowNetworkId;
 
 import javax.annotation.Nullable;
 
-public class SlideshowManager {
+public class ClientSlideshowManager {
     private final MediaFileCache mediaCache;
 
     @Nullable
@@ -33,7 +33,7 @@ public class SlideshowManager {
 
     private final Int2ObjectMap<ScreenClientState> screenStates = new Int2ObjectOpenHashMap<>();
 
-    public SlideshowManager(final MediaFileCache mediaCache) {
+    public ClientSlideshowManager(final MediaFileCache mediaCache) {
         this.mediaCache = mediaCache;
     }
 
@@ -110,7 +110,7 @@ public class SlideshowManager {
         }
     }
 
-    public void start(final SlideshowInstanceId id, final Slideshow slideshow, final double time, final boolean paused) {
+    public void start(final SlideshowNetworkId id, final Slideshow slideshow, final double time, final boolean paused) {
         slideshow.ensureDownloaded(mediaCache);
 
         final ScreenClientState screen = getScreenState(id);
@@ -125,7 +125,7 @@ public class SlideshowManager {
         }
     }
 
-    public void clear(final SlideshowInstanceId id) {
+    public void clear(final SlideshowNetworkId id) {
         final ScreenClientState screen = getScreenState(id);
         if (screen != null) {
             screen.clear();
@@ -135,7 +135,7 @@ public class SlideshowManager {
         }
     }
 
-    public void seekTo(final SlideshowInstanceId id, final double time, final boolean paused) {
+    public void seekTo(final SlideshowNetworkId id, final double time, final boolean paused) {
         final ScreenClientState screen = getScreenState(id);
         if (screen != null) {
             screen.seekTo(time, paused);
@@ -145,7 +145,7 @@ public class SlideshowManager {
     }
 
     @Nullable
-    private ScreenClientState getScreenState(final SlideshowInstanceId id) {
+    private ScreenClientState getScreenState(final SlideshowNetworkId id) {
         final ClientLevel level = Minecraft.getInstance().level;
         if (level == null || id.isFullScreen()) {
             return null;

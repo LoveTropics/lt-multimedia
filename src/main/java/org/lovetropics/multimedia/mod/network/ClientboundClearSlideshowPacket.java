@@ -4,13 +4,12 @@ import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import org.lovetropics.multimedia.mod.MultimediaMod;
-import org.lovetropics.multimedia.mod.slideshow.SlideshowInstanceId;
 
 public record ClientboundClearSlideshowPacket(
-        SlideshowInstanceId id
+        SlideshowNetworkId id
 ) implements CustomPacketPayload {
     public static final StreamCodec<ByteBuf, ClientboundClearSlideshowPacket> STREAM_CODEC = StreamCodec.composite(
-            SlideshowInstanceId.STREAM_CODEC, ClientboundClearSlideshowPacket::id,
+            SlideshowNetworkId.STREAM_CODEC, ClientboundClearSlideshowPacket::id,
             ClientboundClearSlideshowPacket::new
     );
 
