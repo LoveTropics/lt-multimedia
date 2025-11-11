@@ -6,6 +6,8 @@
   ],
   "client": [
     "client.GameRendererMixin",
+    "client.MinecraftMixin",
+    "client.SoundEngineMixin",
     "client.SoundOptionsScreenMixin"
   ],
   "injectors": {

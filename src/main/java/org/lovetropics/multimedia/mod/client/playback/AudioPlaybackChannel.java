@@ -25,7 +25,7 @@ import java.util.Deque;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
-/* package-private */ class AudioPlaybackChannel extends Channel {
+public class AudioPlaybackChannel extends Channel {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     // Ensure we have enough audio to fill the space between ticks, even at a low tick/frame rate
