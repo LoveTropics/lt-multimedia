@@ -4,32 +4,41 @@ import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.gui.screens.LevelLoadingScreen;
 import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.gui.screens.ProgressScreen;
+import net.minecraft.client.gui.screens.ReceivingLevelScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.CommonColors;
+import org.jetbrains.annotations.Nullable;
 import org.lovetropics.multimedia.mod.client.config.MultimediaClientConfig;
 
 public class FullScreenSlideshow implements AutoCloseable {
     private final SlideshowDriver slideshow;
+    private boolean closed;
 
     public FullScreenSlideshow(final SlideshowDriver slideshow) {
         this.slideshow = slideshow;
     }
 
     public boolean tick() {
+        if (closed) {
+            return true;
+        }
+
         slideshow.setAudioVolume((float) MultimediaClientConfig.get().audioVolume.getAsDouble());
         if (slideshow.tick()) {
-            closeScreen();
+            closed = true;
             return true;
-        } else {
-            if (slideshow.hasFadedIn()) {
-                openScreen();
-            }
-            return false;
         }
+
+        if (slideshow.hasFadedIn()) {
+            openScreen();
+        }
+        return false;
     }
 
     public void draw(final SlideshowGraphics graphics, final float partialTicks) {
@@ -57,15 +66,7 @@ public class FullScreenSlideshow implements AutoCloseable {
     private void openScreen() {
         final Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.screen == null) {
-            minecraft.setScreen(new CaptureScreen());
-        }
-    }
-
-    private void closeScreen() {
-        final Minecraft minecraft = Minecraft.getInstance();
-        minecraft.popGuiLayer();
-        if (minecraft.screen instanceof CaptureScreen) {
-            minecraft.setScreen(null);
+            minecraft.pushGuiLayer(new CaptureScreen());
         }
     }
 
@@ -73,14 +74,26 @@ public class FullScreenSlideshow implements AutoCloseable {
         slideshow.seekTo(time, paused);
     }
 
+    public boolean shouldRenderOver(final @Nullable Screen screen) {
+        return screen instanceof ProgressScreen || screen instanceof ReceivingLevelScreen || screen instanceof LevelLoadingScreen;
+    }
+
     @Override
     public void close() {
         slideshow.close();
     }
 
-    public static class CaptureScreen extends Screen {
+    private class CaptureScreen extends Screen {
         public CaptureScreen() {
             super(CommonComponents.EMPTY);
+        }
+
+        @Override
+        public void tick() {
+            super.tick();
+            if (closed) {
+                onClose();
+            }
         }
 
         @Override

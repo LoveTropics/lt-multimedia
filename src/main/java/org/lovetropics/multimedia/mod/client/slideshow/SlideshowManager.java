@@ -4,12 +4,14 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMaps;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
+import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
@@ -37,11 +39,24 @@ public class SlideshowManager {
 
     public void registerOverlays(final RegisterGuiLayersEvent event) {
         event.registerAboveAll(MultimediaMod.location("slideshow"), (graphics, deltaTracker) -> {
-            if (fullScreenSlideshow != null) {
+            final Minecraft minecraft = Minecraft.getInstance();
+            if (fullScreenSlideshow != null && !fullScreenSlideshow.shouldRenderOver(minecraft.screen)) {
                 final float partialTicks = deltaTracker.getGameTimeDeltaPartialTick(true);
-                fullScreenSlideshow.draw(SlideshowGraphics.forGui(graphics, Minecraft.getInstance().font), partialTicks);
+                fullScreenSlideshow.draw(SlideshowGraphics.forGui(graphics, minecraft.font), partialTicks);
             }
         });
+    }
+
+    @SubscribeEvent
+    public void onRenderScreen(final ScreenEvent.Render.Post event) {
+        // Only render over the topmost layer
+        final Screen screen = event.getScreen();
+        if (screen != Minecraft.getInstance().screen) {
+            return;
+        }
+        if (fullScreenSlideshow != null && fullScreenSlideshow.shouldRenderOver(screen)) {
+            fullScreenSlideshow.draw(SlideshowGraphics.forGui(event.getGuiGraphics(), event.getScreen().getFont()), event.getPartialTick());
+        }
     }
 
     @SubscribeEvent
