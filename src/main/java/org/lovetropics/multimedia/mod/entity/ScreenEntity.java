@@ -13,6 +13,8 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.entity.PositionMoveRotation;
+import net.minecraft.world.entity.Relative;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
@@ -29,6 +31,8 @@ import org.lovetropics.multimedia.mod.network.ClientboundStartSlideshowPacket;
 import org.lovetropics.multimedia.mod.network.SlideshowNetworkId;
 import org.lovetropics.multimedia.mod.slideshow.SlideshowHolder;
 import org.lovetropics.multimedia.mod.slideshow.Slideshows;
+
+import java.util.Set;
 
 public class ScreenEntity extends Entity {
     public static final float DEFAULT_WIDTH = 4.0f;
@@ -165,6 +169,12 @@ public class ScreenEntity extends Entity {
             lastYRot = getYRot();
             hasImpulse = true;
         }
+    }
+
+    @Override
+    public void teleportSetPosition(final PositionMoveRotation positionMovementRotation, final Set<Relative> relatives) {
+        super.teleportSetPosition(positionMovementRotation, relatives);
+        hasImpulse = true;
     }
 
     @Override
