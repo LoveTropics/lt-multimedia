@@ -10,6 +10,7 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.CommonColors;
+import org.lovetropics.multimedia.mod.client.config.MultimediaClientConfig;
 
 public class FullScreenSlideshow implements AutoCloseable {
     private final SlideshowDriver slideshow;
@@ -19,6 +20,7 @@ public class FullScreenSlideshow implements AutoCloseable {
     }
 
     public boolean tick() {
+        slideshow.setAudioVolume((float) MultimediaClientConfig.get().audioVolume.getAsDouble());
         if (slideshow.tick()) {
             closeScreen();
             return true;
