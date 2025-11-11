@@ -189,6 +189,10 @@ import java.util.concurrent.locks.ReentrantLock;
         }
     }
 
+    public boolean isEof() {
+        return eof;
+    }
+
     @Override
     public void close() {
         if (closed) {

@@ -190,6 +190,10 @@ public class AudioPlaybackChannel extends Channel {
     }
 
     private double syncClocks(final double audioClockTime) {
+        if (queuedFrames.isEmpty() && packets.isEof()) {
+            return 1.0;
+        }
+
         if (clock.requestSyncTo(audioClockTime)) {
             return 1.0;
         }
