@@ -173,19 +173,20 @@ import java.util.concurrent.locks.ReentrantLock;
         if (seekRequest == null) {
             return;
         }
+        final SeekRequest request;
         lock.lock();
         try {
             // Will never be null, can only be cleared by this thread
-            final SeekRequest request = Objects.requireNonNull(seekRequest);
+            request = Objects.requireNonNull(seekRequest);
             seekRequest = null;
-            try {
-                reader.seekTo(request.time);
-                request.future.complete(null);
-            } catch (final IOException e) {
-                request.future.completeExceptionally(e);
-            }
         } finally {
             lock.unlock();
+        }
+        try {
+            reader.seekTo(request.time);
+            request.future.complete(null);
+        } catch (final IOException e) {
+            request.future.completeExceptionally(e);
         }
     }
 
