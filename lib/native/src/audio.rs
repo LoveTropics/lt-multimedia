@@ -71,7 +71,7 @@ impl AudioDecoder {
         let decoder = codec::context::Context::from_parameters(stream.parameters())?
             .decoder()
             .audio()?;
-        let src_time_base = decoder.time_base();
+        let src_time_base = stream.time_base();
 
         let resampler = Self::create_resampler(&decoder, dst_format);
 
