@@ -354,9 +354,10 @@ public class SlideshowDriver implements AutoCloseable {
         }
 
         public void startOrSync(final PlaybackClock clock) {
-            final double time = clock.getElapsedTime() - startTime;
-            final boolean paused = clock.isPaused();
-            execute(slide -> slide.startOrSync(time, paused));
+            execute(slide -> slide.startOrSync(
+                    clock.getElapsedTime() - startTime,
+                    clock.isPaused()
+            ));
         }
 
         public void setAudioVolume(final float volume) {

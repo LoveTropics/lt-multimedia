@@ -67,9 +67,7 @@ public class FullScreenSlideshow implements AutoCloseable {
     private void openScreen() {
         final Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.screen == null) {
-            minecraft.mouseHandler.releaseMouse();
-            KeyMapping.releaseAll();
-            minecraft.pushGuiLayer(new CaptureScreen());
+            minecraft.setScreen(new CaptureScreen());
         }
     }
 
