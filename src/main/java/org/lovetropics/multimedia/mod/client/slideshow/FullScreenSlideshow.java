@@ -1,6 +1,7 @@
 package org.lovetropics.multimedia.mod.client.slideshow;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.ChatScreen;
@@ -66,6 +67,8 @@ public class FullScreenSlideshow implements AutoCloseable {
     private void openScreen() {
         final Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.screen == null) {
+            minecraft.mouseHandler.releaseMouse();
+            KeyMapping.releaseAll();
             minecraft.pushGuiLayer(new CaptureScreen());
         }
     }
