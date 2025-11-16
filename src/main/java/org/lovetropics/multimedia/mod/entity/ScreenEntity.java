@@ -30,7 +30,7 @@ import org.lovetropics.multimedia.mod.network.ClientboundSeekSlideshowPacket;
 import org.lovetropics.multimedia.mod.network.ClientboundStartSlideshowPacket;
 import org.lovetropics.multimedia.mod.network.SlideshowNetworkId;
 import org.lovetropics.multimedia.mod.slideshow.SlideshowHolder;
-import org.lovetropics.multimedia.mod.slideshow.Slideshows;
+import org.lovetropics.multimedia.mod.slideshow.SlideshowRegistry;
 
 import java.util.Set;
 
@@ -229,7 +229,7 @@ public class ScreenEntity extends Entity {
         entityData.set(DATA_AUDIO_RADIUS, input.getFloatOr("audio_radius", DEFAULT_AUDIO_RADIUS));
         loadSlideshow(
                 input.read("slideshow", ResourceLocation.CODEC)
-                        .map(Slideshows.REGISTRY::get)
+                        .map(SlideshowRegistry.REGISTRY::get)
                         .orElse(null),
                 input.getDoubleOr("time", 0.0),
                 input.getBooleanOr("paused", false)

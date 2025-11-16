@@ -16,7 +16,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import org.lovetropics.multimedia.mod.MultimediaMod;
 import org.lovetropics.multimedia.mod.entity.ScreenEntity;
 import org.lovetropics.multimedia.mod.slideshow.SlideshowHolder;
-import org.lovetropics.multimedia.mod.slideshow.Slideshows;
+import org.lovetropics.multimedia.mod.slideshow.SlideshowRegistry;
 import org.lovetropics.multimedia.mod.slideshow.instance.ServerFullScreenSlideshow;
 
 import java.util.Collection;
@@ -45,7 +45,7 @@ public class SlideshowCommand {
                                 .executes(context -> setSlideshowPaused(getEntities(context, "targets"), false))
                                 .then(argument("id", id())
                                         .suggests((context, builder) ->
-                                                SharedSuggestionProvider.suggestResource(Slideshows.REGISTRY.keySet(), builder)
+                                                SharedSuggestionProvider.suggestResource(SlideshowRegistry.REGISTRY.keySet(), builder)
                                         )
                                         .executes(context -> startSlideshow(getEntities(context, "targets"), getId(context, "id")))
                                 )
@@ -64,7 +64,7 @@ public class SlideshowCommand {
                         .then(literal("preload")
                                 .then(argument("id", id())
                                         .suggests((context, builder) ->
-                                                SharedSuggestionProvider.suggestResource(Slideshows.REGISTRY.keySet(), builder)
+                                                SharedSuggestionProvider.suggestResource(SlideshowRegistry.REGISTRY.keySet(), builder)
                                         )
                                         .executes(context -> preloadSlideshow(getEntities(context, "targets"), getId(context, "id")))
                                 )
@@ -74,7 +74,7 @@ public class SlideshowCommand {
     }
 
     private static int startSlideshow(final Collection<? extends Entity> targets, final ResourceLocation id) throws CommandSyntaxException {
-        final SlideshowHolder slideshow = Slideshows.REGISTRY.get(id);
+        final SlideshowHolder slideshow = SlideshowRegistry.REGISTRY.get(id);
         if (slideshow == null) {
             throw NO_SLIDESHOW.create(id);
         }
@@ -124,7 +124,7 @@ public class SlideshowCommand {
     }
 
     private static int preloadSlideshow(final Collection<? extends Entity> targets, final ResourceLocation id) throws CommandSyntaxException {
-        final SlideshowHolder slideshow = Slideshows.REGISTRY.get(id);
+        final SlideshowHolder slideshow = SlideshowRegistry.REGISTRY.get(id);
         if (slideshow == null) {
             throw NO_SLIDESHOW.create(id);
         }

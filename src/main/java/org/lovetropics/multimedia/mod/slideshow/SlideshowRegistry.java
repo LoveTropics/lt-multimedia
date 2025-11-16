@@ -18,25 +18,30 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.AddServerReloadListenersEvent;
 import org.jetbrains.annotations.Nullable;
+import org.lovetropics.multimedia.mod.MediaFile;
 import org.lovetropics.multimedia.mod.MultimediaMod;
 import org.slf4j.Logger;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.net.URI;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
 
 @EventBusSubscriber(modid = MultimediaMod.ID)
-public class Slideshows {
+public class SlideshowRegistry {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final FileToIdConverter LISTER = FileToIdConverter.json("slideshow");
 
     public static final Map<ResourceLocation, SlideshowHolder> REGISTRY = new HashMap<>();
+    private static final Map<ResourceLocation, SlideshowHolder> IMPORTED_REGISTRY = new HashMap<>();
 
     @SubscribeEvent
     public static void addReloadListener(final AddServerReloadListenersEvent event) {
@@ -47,8 +52,26 @@ public class Slideshows {
                         .thenAcceptAsync(slideshows -> {
                             REGISTRY.clear();
                             slideshows.forEach(holder -> REGISTRY.put(holder.id(), holder));
+                            REGISTRY.putAll(IMPORTED_REGISTRY);
                         }, gameExecutor)
         );
+    }
+
+    public static ResourceLocation importSimpleVideo(final ResourceLocation name, final URI url, final double duration) {
+        final ResourceLocation id = name.withPrefix("import/");
+        final Slideshow slideshow = new Slideshow(
+                List.of(new Slide(
+                        new SlideContent.Video(new MediaFile(url), Duration.ZERO, Duration.ofSeconds((long) (duration * 1000.0)), 1.0f),
+                        Optional.empty(),
+                        Optional.empty()
+                )),
+                SlideTransition.NONE,
+                false
+        );
+        final SlideshowHolder holder = new SlideshowHolder(id, slideshow);
+        REGISTRY.put(id, holder);
+        IMPORTED_REGISTRY.put(id, holder);
+        return id;
     }
 
     private static CompletableFuture<List<SlideshowHolder>> load(final RegistryAccess registryAccess, final ResourceManager resourceManager, final Executor executor) {

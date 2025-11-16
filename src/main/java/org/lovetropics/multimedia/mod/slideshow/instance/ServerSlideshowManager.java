@@ -13,8 +13,9 @@ import org.jetbrains.annotations.Nullable;
 import org.lovetropics.multimedia.mod.entity.ScreenEntity;
 import org.lovetropics.multimedia.mod.network.ClientboundPreloadMediaPacket;
 import org.lovetropics.multimedia.mod.slideshow.SlideshowHolder;
-import org.lovetropics.multimedia.mod.slideshow.Slideshows;
+import org.lovetropics.multimedia.mod.slideshow.SlideshowRegistry;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -45,7 +46,7 @@ public class ServerSlideshowManager implements SlideshowManager {
 
     @Override
     public @Nullable ServerFullScreenSlideshow open(final ResourceLocation id) {
-        final SlideshowHolder slideshow = Slideshows.REGISTRY.get(id);
+        final SlideshowHolder slideshow = SlideshowRegistry.REGISTRY.get(id);
         return slideshow != null ? open(slideshow) : null;
     }
 
@@ -55,7 +56,7 @@ public class ServerSlideshowManager implements SlideshowManager {
 
     @Override
     public void preload(final ServerPlayer player, final ResourceLocation id) {
-        final SlideshowHolder slideshow = Slideshows.REGISTRY.get(id);
+        final SlideshowHolder slideshow = SlideshowRegistry.REGISTRY.get(id);
         if (slideshow != null) {
             preload(player, slideshow);
         }
@@ -66,6 +67,11 @@ public class ServerSlideshowManager implements SlideshowManager {
         for (final ServerFullScreenSlideshow instance : fullScreenInstances) {
             instance.replacePlayer(oldPlayer, newPlayer);
         }
+    }
+
+    @Override
+    public @Nullable ResourceLocation importSimpleVideo(final ResourceLocation name, final URI url, final double duration) {
+        return SlideshowRegistry.importSimpleVideo(name, url, duration);
     }
 
     public void preload(final ServerPlayer player, final SlideshowHolder slideshow) {
