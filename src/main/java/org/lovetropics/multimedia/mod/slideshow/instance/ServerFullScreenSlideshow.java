@@ -35,7 +35,7 @@ public class ServerFullScreenSlideshow implements SlideshowInstanceHandle {
 
     /* package-private */ boolean tick() {
         players.removeIf(Entity::isRemoved);
-        return players.isEmpty() || currentTime() >= totalTime();
+        return players.isEmpty() || (currentTime() >= totalTime && !slideshow.value().looping());
     }
 
     @Override

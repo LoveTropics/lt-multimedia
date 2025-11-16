@@ -6,6 +6,7 @@ import it.unimi.dsi.fastutil.doubles.DoubleList;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 import org.lovetropics.multimedia.mod.client.cache.MediaFileCache;
 import org.lovetropics.multimedia.mod.client.playback.PlaybackSyncType;
 import org.lovetropics.multimedia.mod.slideshow.Slide;
@@ -33,12 +34,14 @@ public class SlideQueue {
     private final List<SlideContent> slides;
     private final DoubleList slideStartTimes;
     private final DoubleList transitions;
+    private final boolean looping;
 
-    private SlideQueue(final MediaFileCache mediaCache, final List<SlideContent> slides, final DoubleList slideStartTimes, final DoubleList transitions) {
+    private SlideQueue(final MediaFileCache mediaCache, final List<SlideContent> slides, final DoubleList slideStartTimes, final DoubleList transitions, final boolean looping) {
         this.mediaCache = mediaCache;
         this.slides = slides;
         this.slideStartTimes = slideStartTimes;
         this.transitions = transitions;
+        this.looping = looping;
     }
 
     public static SlideQueue load(final MediaFileCache mediaCache, final Slideshow slideshow) {
@@ -67,35 +70,72 @@ public class SlideQueue {
         slideStartTimes.add(slideStartTime);
         transitions.add(toSeconds(lastTransition.duration()));
 
-        return new SlideQueue(mediaCache, slides, slideStartTimes, transitions);
+        return new SlideQueue(mediaCache, slides, slideStartTimes, transitions, slideshow.looping());
     }
 
-    public int getSlideIndexAt(final double time) {
+    public int getSlideIndexAt(double time) {
+        final int baseIndex;
+        if (looping) {
+            final double totalDuration = getTotalDuration();
+            final int loopCount = Mth.floor(time / totalDuration);
+            baseIndex = loopCount * slides.size();
+            time -= loopCount * totalDuration;
+        } else {
+            baseIndex = 0;
+        }
+
         for (int i = 0; i < slides.size(); i++) {
             if (time < getSlideEndTime(i)) {
-                return i;
+                return baseIndex + i;
             }
         }
-        return slides.size();
+
+        return baseIndex + slides.size();
     }
 
-    public double getSlideStartTime(final int index) {
-        return slideStartTimes.getDouble(index);
+    public double getSlideStartTime(int index) {
+        final double baseTime;
+        if (looping) {
+            final int loopCount = Mth.floorDiv(index, slides.size());
+            baseTime = loopCount * getTotalDuration();
+            index -= loopCount * slides.size();
+        } else {
+            baseTime = 0.0;
+        }
+        return slideStartTimes.getDouble(index) + baseTime;
     }
 
-    public double getSlideEndTime(final int index) {
-        return slideStartTimes.getDouble(index + 1);
+    public double getSlideEndTime(int index) {
+        final double baseTime;
+        if (looping) {
+            final int loopCount = Mth.floorDiv(index, slides.size());
+            baseTime = loopCount * getTotalDuration();
+            index -= loopCount * slides.size();
+        } else {
+            baseTime = 0.0;
+        }
+        return slideStartTimes.getDouble(index + 1) + baseTime;
     }
 
-    public double getTransitionIn(final int index) {
+    public double getTransitionIn(int index) {
+        if (looping) {
+            index = Math.floorMod(index, slides.size());
+        }
         return transitions.getDouble(index);
+    }
+
+    public double getTotalDuration() {
+        return slideStartTimes.getDouble(slides.size());
     }
 
     public int size() {
         return slides.size();
     }
 
-    public CompletableFuture<PreparedSlide> prepareSlide(final int index, final PlaybackSyncType syncType) {
+    public CompletableFuture<PreparedSlide> prepareSlide(int index, final PlaybackSyncType syncType) {
+        if (looping) {
+            index = Math.floorMod(index, slides.size());
+        }
         final SlideContent content = slides.get(index);
         return PreparedSlide.tryPrepare(content, mediaCache, syncType).exceptionally(throwable -> {
             LOGGER.error("Failed to load slide {}", content, throwable);

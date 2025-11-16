@@ -17,10 +17,7 @@ public class ScreenClientState implements AutoCloseable {
         if (driver != null) {
             driver.setAudioVolume((float) MultimediaClientConfig.get().audioVolume.getAsDouble());
             driver.setAudioSource(screen.asAudioSource());
-            if (driver.tick()) {
-                driver.close();
-                driver = null;
-            }
+            driver.tick();
         }
     }
 

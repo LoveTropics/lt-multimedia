@@ -76,7 +76,7 @@ public class SlideshowDriver implements AutoCloseable {
     private Slide prepareSlide(final int index) {
         if (index < 0) {
             return new Slide(index, null, 0.0, 0.0, 0.0);
-        } else if (index >= slideQueue.size()) {
+        } else if (!slideshow.looping() && index >= slideQueue.size()) {
             final double startTime = slideQueue.getSlideStartTime(index);
             final double transitionIn = slideQueue.getTransitionIn(index);
             return new Slide(index, null, startTime, startTime, transitionIn);

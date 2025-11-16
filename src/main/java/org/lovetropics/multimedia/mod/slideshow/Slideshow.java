@@ -15,11 +15,13 @@ import java.util.stream.Stream;
 
 public record Slideshow(
         List<Slide> slides,
-        SlideTransition defaultTransition
+        SlideTransition defaultTransition,
+        boolean looping
 ) {
     public static final Codec<Slideshow> CODEC = RecordCodecBuilder.create(i -> i.group(
             ExtraCodecs.nonEmptyList(Slide.CODEC.listOf()).fieldOf("slides").forGetter(Slideshow::slides),
-            SlideTransition.CODEC.optionalFieldOf("default_transition", SlideTransition.NONE).forGetter(Slideshow::defaultTransition)
+            SlideTransition.CODEC.optionalFieldOf("default_transition", SlideTransition.NONE).forGetter(Slideshow::defaultTransition),
+            Codec.BOOL.optionalFieldOf("looping", false).forGetter(Slideshow::looping)
     ).apply(i, Slideshow::new));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, Slideshow> STREAM_CODEC = ByteBufCodecs.fromCodecWithRegistries(CODEC);
