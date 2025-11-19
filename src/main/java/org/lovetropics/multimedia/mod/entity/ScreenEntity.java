@@ -1,6 +1,7 @@
 package org.lovetropics.multimedia.mod.entity;
 
 import com.lovetropics.lib.slideshow.SlideshowInstanceHandle;
+import com.mojang.serialization.Codec;
 import it.unimi.dsi.fastutil.objects.Reference2BooleanMap;
 import it.unimi.dsi.fastutil.objects.Reference2BooleanMaps;
 import it.unimi.dsi.fastutil.objects.Reference2BooleanOpenHashMap;
@@ -50,11 +51,19 @@ public class ScreenEntity extends Entity {
     private static final EntityDataAccessor<Float> DATA_HEIGHT = SynchedEntityData.defineId(ScreenEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> DATA_AUDIO_RADIUS = SynchedEntityData.defineId(ScreenEntity.class, EntityDataSerializers.FLOAT);
 
+    private static final Codec<AABB> AABB_CODEC = Codec.DOUBLE.listOf(6, 6).xmap(
+            coordinates -> new AABB(coordinates.get(0), coordinates.get(1), coordinates.get(2), coordinates.get(3), coordinates.get(4), coordinates.get(5)),
+            aabb -> List.of(aabb.minX, aabb.minY, aabb.minZ, aabb.maxX, aabb.maxY, aabb.maxZ)
+    );
+
     @Nullable
     private SlideshowHolder slideshow;
     private final PlaybackClock clock = new PlaybackClock();
 
     private boolean requiresItemToView;
+    @Nullable
+    private AABB insideBoxToView;
+
     @Nullable
     private SlideshowHolder fallbackSlideshow;
 
@@ -72,9 +81,14 @@ public class ScreenEntity extends Entity {
     }
 
     public boolean isPermittedToView(final ServerPlayer player) {
-        if (!requiresItemToView || slideshow == null) {
+        if (slideshow == null) {
             return true;
         }
+        return (!requiresItemToView || hasItemToView(player, slideshow))
+                && (insideBoxToView == null || insideBoxToView.contains(player.position()));
+    }
+
+    private boolean hasItemToView(final ServerPlayer player, final SlideshowHolder slideshow) {
         for (final EquipmentSlot slot : EquipmentSlot.VALUES) {
             final ItemStack itemStack = player.getItemBySlot(slot);
             final List<ResourceLocation> slideshows = itemStack.getOrDefault(MultimediaMod.SLIDESHOW_VIEWER, List.of());
@@ -277,6 +291,8 @@ public class ScreenEntity extends Entity {
 
         output.storeNullable("fallback_slideshow", SlideshowHolder.CODEC, fallbackSlideshow);
         output.putBoolean("requires_item_to_view", requiresItemToView);
+
+        output.storeNullable("inside_box_to_view", AABB_CODEC, insideBoxToView);
     }
 
     @Override
@@ -292,6 +308,8 @@ public class ScreenEntity extends Entity {
 
         fallbackSlideshow = input.read("fallback_slideshow", SlideshowHolder.CODEC).orElse(null);
         requiresItemToView = input.getBooleanOr("requires_item_to_view", false);
+
+        insideBoxToView = input.read("inside_box_to_view", AABB_CODEC).orElse(null);
     }
 
     @Override
