@@ -1,7 +1,9 @@
 package org.lovetropics.multimedia.mod.entity;
 
 import com.lovetropics.lib.slideshow.SlideshowInstanceHandle;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import it.unimi.dsi.fastutil.objects.Reference2BooleanMap;
+import it.unimi.dsi.fastutil.objects.Reference2BooleanMaps;
+import it.unimi.dsi.fastutil.objects.Reference2BooleanOpenHashMap;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -12,9 +14,11 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.PositionMoveRotation;
 import net.minecraft.world.entity.Relative;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
@@ -23,6 +27,7 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
+import org.lovetropics.multimedia.mod.MultimediaMod;
 import org.lovetropics.multimedia.mod.PlaybackClock;
 import org.lovetropics.multimedia.mod.client.playback.AudioWorldSource;
 import org.lovetropics.multimedia.mod.network.ClientboundClearSlideshowPacket;
@@ -30,11 +35,13 @@ import org.lovetropics.multimedia.mod.network.ClientboundSeekSlideshowPacket;
 import org.lovetropics.multimedia.mod.network.ClientboundStartSlideshowPacket;
 import org.lovetropics.multimedia.mod.network.SlideshowNetworkId;
 import org.lovetropics.multimedia.mod.slideshow.SlideshowHolder;
-import org.lovetropics.multimedia.mod.slideshow.SlideshowRegistry;
 
+import java.util.List;
 import java.util.Set;
 
 public class ScreenEntity extends Entity {
+    private static final int PERMISSION_CHECK_INTERVAL = 10;
+
     public static final float DEFAULT_WIDTH = 4.0f;
     public static final float DEFAULT_HEIGHT = 2.25f;
     public static final float DEFAULT_AUDIO_RADIUS = 64.0f;
@@ -47,6 +54,12 @@ public class ScreenEntity extends Entity {
     private SlideshowHolder slideshow;
     private final PlaybackClock clock = new PlaybackClock();
 
+    private boolean requiresItemToView;
+    @Nullable
+    private SlideshowHolder fallbackSlideshow;
+
+    private final Reference2BooleanMap<ServerPlayer> trackingPlayers = new Reference2BooleanOpenHashMap<>();
+
     private float lastXRot;
     private float lastYRot;
 
@@ -58,12 +71,41 @@ public class ScreenEntity extends Entity {
         return SlideshowNetworkId.of(this);
     }
 
+    public boolean isPermittedToView(final ServerPlayer player) {
+        if (!requiresItemToView || slideshow == null) {
+            return true;
+        }
+        for (final EquipmentSlot slot : EquipmentSlot.VALUES) {
+            final ItemStack itemStack = player.getItemBySlot(slot);
+            final List<ResourceLocation> slideshows = itemStack.getOrDefault(MultimediaMod.SLIDESHOW_VIEWER, List.of());
+            if (slideshows.contains(slideshow.id()) && player.isEquippableInSlot(itemStack, slot)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public void startSeenByPlayer(final ServerPlayer player) {
         super.startSeenByPlayer(player);
+        final boolean permittedToView = isPermittedToView(player);
+        sendSlideshowTo(player, permittedToView, true);
+        trackingPlayers.put(player, permittedToView);
+    }
+
+    private void sendSlideshowTo(final ServerPlayer player, final boolean permittedToView, final boolean initialTrack) {
+        final SlideshowHolder slideshow = permittedToView ? this.slideshow : fallbackSlideshow;
         if (slideshow != null) {
             player.connection.send(new ClientboundStartSlideshowPacket(networkId(), slideshow.value(), clock.getElapsedTime(), clock.isPaused()));
+        } else if (!initialTrack) {
+            player.connection.send(new ClientboundClearSlideshowPacket(networkId()));
         }
+    }
+
+    @Override
+    public void stopSeenByPlayer(final ServerPlayer serverPlayer) {
+        super.stopSeenByPlayer(serverPlayer);
+        trackingPlayers.removeBoolean(serverPlayer);
     }
 
     @Override
@@ -117,13 +159,9 @@ public class ScreenEntity extends Entity {
     public void setSlideshow(@Nullable final SlideshowHolder slideshow) {
         clock.set(0.0, false);
         this.slideshow = slideshow;
-        final CustomPacketPayload packet;
-        if (slideshow != null) {
-            packet = new ClientboundStartSlideshowPacket(networkId(), slideshow.value(), 0.0, clock.isPaused());
-        } else {
-            packet = new ClientboundClearSlideshowPacket(networkId());
+        for (final Reference2BooleanMap.Entry<ServerPlayer> entry : Reference2BooleanMaps.fastIterable(trackingPlayers)) {
+            sendSlideshowTo(entry.getKey(), entry.getBooleanValue(), false);
         }
-        PacketDistributor.sendToPlayersTrackingEntity(this, packet);
     }
 
     private void loadSlideshow(@Nullable final SlideshowHolder slideshow, final double time, final boolean paused) {
@@ -168,6 +206,22 @@ public class ScreenEntity extends Entity {
             lastXRot = getXRot();
             lastYRot = getYRot();
             hasImpulse = true;
+        }
+
+        if (!level().isClientSide() && tickCount % PERMISSION_CHECK_INTERVAL == 0) {
+            checkViewerPermissions();
+        }
+    }
+
+    private void checkViewerPermissions() {
+        for (final Reference2BooleanMap.Entry<ServerPlayer> entry : Reference2BooleanMaps.fastIterable(trackingPlayers)) {
+            final boolean wasPermittedToView = entry.getBooleanValue();
+            final boolean isPermittedToView = isPermittedToView(entry.getKey());
+            if (wasPermittedToView == isPermittedToView) {
+                continue;
+            }
+            sendSlideshowTo(entry.getKey(), isPermittedToView, false);
+            entry.setValue(isPermittedToView);
         }
     }
 
@@ -215,11 +269,14 @@ public class ScreenEntity extends Entity {
         output.putFloat("width", getWidth());
         output.putFloat("height", getHeight());
         output.putFloat("audio_radius", getAudioRadius());
+        output.storeNullable("slideshow", SlideshowHolder.CODEC, slideshow);
         if (slideshow != null) {
-            output.store("slideshow", ResourceLocation.CODEC, slideshow.id());
             output.putDouble("time", clock.getElapsedTime());
             output.putBoolean("paused", clock.isPaused());
         }
+
+        output.storeNullable("fallback_slideshow", SlideshowHolder.CODEC, fallbackSlideshow);
+        output.putBoolean("requires_item_to_view", requiresItemToView);
     }
 
     @Override
@@ -228,12 +285,13 @@ public class ScreenEntity extends Entity {
         entityData.set(DATA_HEIGHT, input.getFloatOr("height", DEFAULT_HEIGHT));
         entityData.set(DATA_AUDIO_RADIUS, input.getFloatOr("audio_radius", DEFAULT_AUDIO_RADIUS));
         loadSlideshow(
-                input.read("slideshow", ResourceLocation.CODEC)
-                        .map(SlideshowRegistry.REGISTRY::get)
-                        .orElse(null),
+                input.read("slideshow", SlideshowHolder.CODEC).orElse(null),
                 input.getDoubleOr("time", 0.0),
                 input.getBooleanOr("paused", false)
         );
+
+        fallbackSlideshow = input.read("fallback_slideshow", SlideshowHolder.CODEC).orElse(null);
+        requiresItemToView = input.getBooleanOr("requires_item_to_view", false);
     }
 
     @Override
