@@ -241,7 +241,7 @@ public class VideoFrameUploader implements AutoCloseable {
 
         private GpuBuffer createBuffer(final GpuDevice device, final FrameSize frameSize) {
             final int sizeBytes = frameSize.width() * frameSize.height() * TextureFormat.RGBA8.pixelSize();
-            return device.createBuffer(() -> "Video frame buffer", GpuBuffer.USAGE_COPY_SRC | GpuBuffer.USAGE_MAP_WRITE, sizeBytes);
+            return device.createBuffer(() -> "Video frame buffer", GpuBuffer.USAGE_COPY_SRC | GpuBuffer.USAGE_MAP_WRITE | GpuBuffer.USAGE_HINT_CLIENT_STORAGE, sizeBytes);
         }
 
         private void mapBuffer(final GpuDevice device, final FrameSize requestedFrameSize) {
