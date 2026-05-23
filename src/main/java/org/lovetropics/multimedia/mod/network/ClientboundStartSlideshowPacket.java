@@ -21,7 +21,7 @@ public record ClientboundStartSlideshowPacket(
             ClientboundStartSlideshowPacket::new
     );
 
-    public static final Type<ClientboundStartSlideshowPacket> TYPE = new Type<>(MultimediaMod.location("start_slideshow"));
+    public static final Type<ClientboundStartSlideshowPacket> TYPE = new Type<>(MultimediaMod.id("start_slideshow"));
 
     @Override
     public Type<ClientboundStartSlideshowPacket> type() {

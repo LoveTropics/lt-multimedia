@@ -18,7 +18,7 @@ public record ClientboundSeekSlideshowPacket(
             ClientboundSeekSlideshowPacket::new
     );
 
-    public static final Type<ClientboundSeekSlideshowPacket> TYPE = new Type<>(MultimediaMod.location("seek_slideshow"));
+    public static final Type<ClientboundSeekSlideshowPacket> TYPE = new Type<>(MultimediaMod.id("seek_slideshow"));
 
     @Override
     public Type<ClientboundSeekSlideshowPacket> type() {

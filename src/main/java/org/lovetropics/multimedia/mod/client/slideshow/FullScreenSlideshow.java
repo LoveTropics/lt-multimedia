@@ -1,17 +1,16 @@
 package org.lovetropics.multimedia.mod.client.slideshow;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.LevelLoadingScreen;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.ProgressScreen;
-import net.minecraft.client.gui.screens.ReceivingLevelScreen;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.network.chat.Component;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.CommonColors;
 import org.jetbrains.annotations.Nullable;
@@ -76,7 +75,7 @@ public class FullScreenSlideshow implements AutoCloseable {
     }
 
     public boolean shouldRenderOver(final @Nullable Screen screen) {
-        return screen instanceof ProgressScreen || screen instanceof ReceivingLevelScreen || screen instanceof LevelLoadingScreen;
+        return screen instanceof ProgressScreen || screen instanceof LevelLoadingScreen;
     }
 
     @Override
@@ -98,35 +97,23 @@ public class FullScreenSlideshow implements AutoCloseable {
         }
 
         @Override
-        public void renderBackground(final GuiGraphics graphics, final int mouseX, final int mouseY, final float partialTick) {
+        public void extractBackground(final GuiGraphicsExtractor graphics, final int mouseX, final int mouseY, final float a) {
             // Pass through to in-game
         }
 
-        private void openChatScreen(final String defaultText) {
-            final Minecraft.ChatStatus chatStatus = minecraft.getChatStatus();
-            if (!chatStatus.isChatAllowed(minecraft.isLocalServer())) {
-                final Component component = chatStatus.getMessage();
-                minecraft.gui.setOverlayMessage(component, false);
-                minecraft.getNarrator().saySystemNow(component);
-                minecraft.gui.setChatDisabledByPlayerShown(chatStatus == Minecraft.ChatStatus.DISABLED_BY_PROFILE);
-            } else {
-                minecraft.pushGuiLayer(new ChatScreen(defaultText));
-            }
-        }
-
         @Override
-        public boolean keyPressed(final int keyCode, final int scanCode, final int modifiers) {
-            if (keyCode == InputConstants.KEY_ESCAPE) {
+        public boolean keyPressed(final KeyEvent event) {
+            if (event.key() == InputConstants.KEY_ESCAPE) {
                 minecraft.pushGuiLayer(new PauseScreen(true));
                 return true;
-            } else if (minecraft.options.keyChat.matches(keyCode, scanCode)) {
-                openChatScreen("");
+            } else if (minecraft.options.keyChat.matches(event)) {
+                minecraft.gui.getChat().openScreen(ChatComponent.ChatMethod.MESSAGE, ChatScreen::new);
                 return true;
-            } else if (minecraft.options.keyCommand.matches(keyCode, scanCode)) {
-                openChatScreen("/");
+            } else if (minecraft.options.keyCommand.matches(event)) {
+                minecraft.gui.getChat().openScreen(ChatComponent.ChatMethod.COMMAND, ChatScreen::new);
                 return true;
             }
-            return super.keyPressed(keyCode, scanCode, modifiers);
+            return super.keyPressed(event);
         }
 
         @Override

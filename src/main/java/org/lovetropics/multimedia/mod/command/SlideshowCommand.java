@@ -7,7 +7,7 @@ import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -29,8 +29,8 @@ import static net.minecraft.commands.Commands.argument;
 import static net.minecraft.commands.Commands.literal;
 import static net.minecraft.commands.arguments.EntityArgument.entities;
 import static net.minecraft.commands.arguments.EntityArgument.getEntities;
-import static net.minecraft.commands.arguments.ResourceLocationArgument.getId;
-import static net.minecraft.commands.arguments.ResourceLocationArgument.id;
+import static net.minecraft.commands.arguments.IdentifierArgument.getId;
+import static net.minecraft.commands.arguments.IdentifierArgument.id;
 
 @EventBusSubscriber(modid = MultimediaMod.ID)
 public class SlideshowCommand {
@@ -73,7 +73,7 @@ public class SlideshowCommand {
         );
     }
 
-    private static int startSlideshow(final Collection<? extends Entity> targets, final ResourceLocation id) throws CommandSyntaxException {
+    private static int startSlideshow(final Collection<? extends Entity> targets, final Identifier id) throws CommandSyntaxException {
         final SlideshowHolder slideshow = SlideshowRegistry.REGISTRY.get(id);
         if (slideshow == null) {
             throw NO_SLIDESHOW.create(id);
@@ -123,7 +123,7 @@ public class SlideshowCommand {
         return instances.size();
     }
 
-    private static int preloadSlideshow(final Collection<? extends Entity> targets, final ResourceLocation id) throws CommandSyntaxException {
+    private static int preloadSlideshow(final Collection<? extends Entity> targets, final Identifier id) throws CommandSyntaxException {
         final SlideshowHolder slideshow = SlideshowRegistry.REGISTRY.get(id);
         if (slideshow == null) {
             throw NO_SLIDESHOW.create(id);

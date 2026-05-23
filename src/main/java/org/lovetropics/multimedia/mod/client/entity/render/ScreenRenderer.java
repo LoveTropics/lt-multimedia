@@ -3,15 +3,16 @@ package org.lovetropics.multimedia.mod.client.entity.render;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.util.CommonColors;
+import net.minecraft.util.LightCoordsUtil;
 import org.lovetropics.multimedia.mod.client.MultimediaClientMod;
 import org.lovetropics.multimedia.mod.client.entity.ScreenClientState;
-import org.lovetropics.multimedia.mod.client.slideshow.SlideshowGraphics;
 import org.lovetropics.multimedia.mod.client.slideshow.ClientSlideshowManager;
+import org.lovetropics.multimedia.mod.client.slideshow.SlideshowGraphics;
 import org.lovetropics.multimedia.mod.entity.ScreenEntity;
 
 public class ScreenRenderer extends EntityRenderer<ScreenEntity, ScreenRenderState> {
@@ -25,14 +26,14 @@ public class ScreenRenderer extends EntityRenderer<ScreenEntity, ScreenRenderSta
     }
 
     @Override
-    public void render(final ScreenRenderState state, final PoseStack poseStack, final MultiBufferSource bufferSource, final int packedLight) {
-        super.render(state, poseStack, bufferSource, packedLight);
+    public void submit(final ScreenRenderState state, final PoseStack poseStack, final SubmitNodeCollector submitNodeCollector, final CameraRenderState camera) {
+        super.submit(state, poseStack, submitNodeCollector, camera);
 
         poseStack.pushPose();
         poseStack.mulPose(Axis.YP.rotationDegrees(-state.yRot));
         poseStack.mulPose(Axis.XP.rotationDegrees(state.xRot));
 
-        final SlideshowGraphics graphics = SlideshowGraphics.forWorld(poseStack.last(), state.width, state.height, LightTexture.FULL_BRIGHT, bufferSource, font);
+        final SlideshowGraphics graphics = SlideshowGraphics.forWorld(poseStack.last(), state.width, state.height, LightCoordsUtil.FULL_BRIGHT, submitNodeCollector, font);
         if (graphics != null) {
             graphics.fill(0, 0, graphics.width(), graphics.height(), CommonColors.BLACK);
             if (state.slideshowState != null) {

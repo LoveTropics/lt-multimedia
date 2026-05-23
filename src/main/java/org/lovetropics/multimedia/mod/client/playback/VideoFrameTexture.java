@@ -1,12 +1,13 @@
 package org.lovetropics.multimedia.mod.client.playback;
 
 import com.mojang.blaze3d.systems.GpuDevice;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.TextureFormat;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.TextureManager;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.lovetropics.multimedia.mod.MultimediaMod;
 
 import javax.annotation.Nullable;
@@ -16,16 +17,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class VideoFrameTexture extends AbstractTexture {
     private static final AtomicInteger NEXT_ID = new AtomicInteger();
 
-    private final ResourceLocation location;
+    private final Identifier location;
     @Nullable
     private FrameSize frameSize;
 
-    private VideoFrameTexture(final ResourceLocation location) {
+    private VideoFrameTexture(final Identifier location) {
         this.location = location;
+        sampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR);
     }
 
     /* package-private */ static VideoFrameTexture register(final TextureManager textureManager) {
-        final ResourceLocation location = MultimediaMod.location("video_frame_" + NEXT_ID.getAndIncrement());
+        final Identifier location = MultimediaMod.id("video_frame_" + NEXT_ID.getAndIncrement());
         final VideoFrameTexture texture = new VideoFrameTexture(location);
         textureManager.register(texture.location(), texture);
         return texture;
@@ -43,7 +45,6 @@ public class VideoFrameTexture extends AbstractTexture {
             textureView.close();
         }
         texture = device.createTexture("Video", GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_COPY_DST, TextureFormat.RGBA8, frameSize.width(), frameSize.height(), 1, 1);
-        texture.setTextureFilter(FilterMode.LINEAR, false);
         textureView = device.createTextureView(texture);
 
         return texture;
@@ -65,7 +66,7 @@ public class VideoFrameTexture extends AbstractTexture {
         return Objects.requireNonNull(frameSize, "No frame present");
     }
 
-    public ResourceLocation location() {
+    public Identifier location() {
         return location;
     }
 }

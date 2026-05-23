@@ -20,8 +20,8 @@ import org.lovetropics.multimedia.mod.client.cache.MediaFileCache;
 import org.lovetropics.multimedia.mod.client.entity.ScreenClientState;
 import org.lovetropics.multimedia.mod.client.playback.PlaybackSyncType;
 import org.lovetropics.multimedia.mod.entity.ScreenEntity;
-import org.lovetropics.multimedia.mod.slideshow.Slideshow;
 import org.lovetropics.multimedia.mod.network.SlideshowNetworkId;
+import org.lovetropics.multimedia.mod.slideshow.Slideshow;
 
 import javax.annotation.Nullable;
 
@@ -38,7 +38,7 @@ public class ClientSlideshowManager {
     }
 
     public void registerOverlays(final RegisterGuiLayersEvent event) {
-        event.registerAboveAll(MultimediaMod.location("slideshow"), (graphics, deltaTracker) -> {
+        event.registerAboveAll(MultimediaMod.id("slideshow"), (graphics, deltaTracker) -> {
             final Minecraft minecraft = Minecraft.getInstance();
             if (fullScreenSlideshow != null && !fullScreenSlideshow.shouldRenderOver(minecraft.screen)) {
                 final float partialTicks = deltaTracker.getGameTimeDeltaPartialTick(true);

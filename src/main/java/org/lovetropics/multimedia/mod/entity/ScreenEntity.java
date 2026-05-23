@@ -8,7 +8,7 @@ import it.unimi.dsi.fastutil.objects.Reference2BooleanOpenHashMap;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
@@ -91,7 +91,7 @@ public class ScreenEntity extends Entity {
     private boolean hasItemToView(final ServerPlayer player, final SlideshowHolder slideshow) {
         for (final EquipmentSlot slot : EquipmentSlot.VALUES) {
             final ItemStack itemStack = player.getItemBySlot(slot);
-            final List<ResourceLocation> slideshows = itemStack.getOrDefault(MultimediaMod.SLIDESHOW_VIEWER, List.of());
+            final List<Identifier> slideshows = itemStack.getOrDefault(MultimediaMod.SLIDESHOW_VIEWER, List.of());
             if (slideshows.contains(slideshow.id()) && player.isEquippableInSlot(itemStack, slot)) {
                 return true;
             }
@@ -219,7 +219,7 @@ public class ScreenEntity extends Entity {
             refreshDimensions();
             lastXRot = getXRot();
             lastYRot = getYRot();
-            hasImpulse = true;
+            needsSync = true;
         }
 
         if (!level().isClientSide() && tickCount % PERMISSION_CHECK_INTERVAL == 0) {
@@ -242,7 +242,7 @@ public class ScreenEntity extends Entity {
     @Override
     public void teleportSetPosition(final PositionMoveRotation positionMovementRotation, final Set<Relative> relatives) {
         super.teleportSetPosition(positionMovementRotation, relatives);
-        hasImpulse = true;
+        needsSync = true;
     }
 
     @Override

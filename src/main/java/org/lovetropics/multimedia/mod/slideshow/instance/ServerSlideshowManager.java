@@ -2,7 +2,7 @@ package org.lovetropics.multimedia.mod.slideshow.instance;
 
 import com.lovetropics.lib.slideshow.SlideshowInstanceHandle;
 import com.lovetropics.lib.slideshow.SlideshowManager;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -45,7 +45,7 @@ public class ServerSlideshowManager implements SlideshowManager {
     }
 
     @Override
-    public @Nullable ServerFullScreenSlideshow open(final ResourceLocation id) {
+    public @Nullable ServerFullScreenSlideshow open(final Identifier id) {
         final SlideshowHolder slideshow = SlideshowRegistry.REGISTRY.get(id);
         return slideshow != null ? open(slideshow) : null;
     }
@@ -55,7 +55,7 @@ public class ServerSlideshowManager implements SlideshowManager {
     }
 
     @Override
-    public void preload(final ServerPlayer player, final ResourceLocation id) {
+    public void preload(final ServerPlayer player, final Identifier id) {
         final SlideshowHolder slideshow = SlideshowRegistry.REGISTRY.get(id);
         if (slideshow != null) {
             preload(player, slideshow);
@@ -70,7 +70,7 @@ public class ServerSlideshowManager implements SlideshowManager {
     }
 
     @Override
-    public @Nullable ResourceLocation importSimpleVideo(final ResourceLocation name, final URI url, final double duration) {
+    public @Nullable Identifier importSimpleVideo(final Identifier name, final URI url, final double duration) {
         return SlideshowRegistry.importSimpleVideo(name, url, duration);
     }
 

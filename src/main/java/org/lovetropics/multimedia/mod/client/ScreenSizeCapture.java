@@ -23,7 +23,7 @@ public class ScreenSizeCapture {
 
     @SubscribeEvent
     public static void onFrameGraphSetup(final FrameGraphSetupEvent event) {
-        CAPTURED_PROJECTION.set(event.getProjectionMatrix());
+        CAPTURED_PROJECTION.set(event.getCameraState().projectionMatrix);
     }
 
     @Nullable

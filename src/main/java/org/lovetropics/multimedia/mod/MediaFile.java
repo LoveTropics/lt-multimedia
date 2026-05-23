@@ -5,9 +5,9 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.DecoderException;
-import net.minecraft.Util;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.Util;
 import net.neoforged.fml.loading.FMLEnvironment;
 
 import java.net.URI;
@@ -18,7 +18,7 @@ import java.util.Set;
 public record MediaFile(
         URI uri
 ) {
-    public static final boolean CAN_PLAY_FROM_LOCAL_FILE = !FMLEnvironment.production;
+    public static final boolean CAN_PLAY_FROM_LOCAL_FILE = !FMLEnvironment.isProduction();
 
     private static final Set<String> ALLOWED_SCHEMES = Util.make(() -> {
         ImmutableSet.Builder<String> schemes = ImmutableSet.builder();

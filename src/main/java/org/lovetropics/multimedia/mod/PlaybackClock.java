@@ -1,6 +1,6 @@
 package org.lovetropics.multimedia.mod;
 
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import org.lovetropics.multimedia.mod.client.playback.ClockSyncer;
 
 public class PlaybackClock {

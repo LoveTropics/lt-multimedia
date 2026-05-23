@@ -17,7 +17,7 @@ public record ClientboundPreloadMediaPacket(
             ClientboundPreloadMediaPacket::new
     );
 
-    public static final Type<ClientboundPreloadMediaPacket> TYPE = new Type<>(MultimediaMod.location("preload_media"));
+    public static final Type<ClientboundPreloadMediaPacket> TYPE = new Type<>(MultimediaMod.id("preload_media"));
 
     @Override
     public Type<ClientboundPreloadMediaPacket> type() {

@@ -2,12 +2,12 @@ package org.lovetropics.multimedia.mod.client.cache;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.logging.LogUtils;
-import net.minecraft.FileUtil;
-import net.minecraft.Util;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import net.minecraft.util.FileUtil;
+import net.minecraft.util.Util;
 import net.minecraft.util.thread.ConsecutiveExecutor;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.http.HttpStatus;
 import org.lovetropics.multimedia.MultimediaReader;
 import org.lovetropics.multimedia.mod.MediaFile;
 import org.lwjgl.BufferUtils;
@@ -264,7 +264,7 @@ public class MediaFileCache {
     private CachedFile handleDownloadResponse(final URI uri, final HttpResponse<FileDownload.Response> response) throws IOException {
         final Optional<String> etag = response.headers().firstValue("ETag");
 
-        if (response.statusCode() == HttpStatus.SC_NOT_MODIFIED) {
+        if (response.statusCode() == HttpResponseStatus.NOT_MODIFIED.code()) {
             final CachedFile matchingFile = streamFilesForUri(uri)
                     .filter(cached -> cached.fileId().etag().equals(etag))
                     .findFirst()

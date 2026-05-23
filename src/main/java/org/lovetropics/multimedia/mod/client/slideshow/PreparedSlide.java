@@ -2,12 +2,12 @@ package org.lovetropics.multimedia.mod.client.slideshow;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
+import net.minecraft.util.Util;
 import org.apache.commons.io.IOUtils;
 import org.lovetropics.multimedia.DecoderException;
 import org.lovetropics.multimedia.MultimediaReader;
@@ -83,7 +83,7 @@ public interface PreparedSlide extends AutoCloseable {
         final FrameSize imageSize = new FrameSize(image.getWidth(), image.getHeight());
         // We don't need to keep the image CPU-side now that we've uploaded it
         texture.setPixels(null);
-        final ResourceLocation textureId = MultimediaMod.location("image_slide_" + Image.NEXT_ID.getAndIncrement());
+        final Identifier textureId = MultimediaMod.id("image_slide_" + Image.NEXT_ID.getAndIncrement());
         Minecraft.getInstance().getTextureManager().register(textureId, texture);
         return new Image(textureId, texture, imageSize, PreparedSlideDecorations.prepare(decorations));
     }
@@ -148,7 +148,7 @@ public interface PreparedSlide extends AutoCloseable {
         }
     }
 
-    record Image(ResourceLocation textureId, DynamicTexture texture, FrameSize imageSize, PreparedSlideDecorations decorations) implements PreparedSlide {
+    record Image(Identifier textureId, DynamicTexture texture, FrameSize imageSize, PreparedSlideDecorations decorations) implements PreparedSlide {
         private static final AtomicInteger NEXT_ID = new AtomicInteger();
 
         @Override

@@ -7,7 +7,6 @@ import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.textures.GpuTexture;
-import net.neoforged.neoforge.client.blaze3d.validation.ValidationGpuTexture;
 
 public class GpuExtensions {
     public static void copyBufferToTexture(final GpuBuffer src, final GpuTexture dst, final int xOffset, final int yOffset, final int width, final int height, final NativeImage.Format pixelFormat) {
@@ -28,9 +27,6 @@ public class GpuExtensions {
     }
 
     private static int handle(final GpuTexture texture) {
-        if (texture instanceof final ValidationGpuTexture validationGpuTexture) {
-            return ((GlTexture) validationGpuTexture.getRealTexture()).glId();
-        }
         return ((GlTexture) texture).glId();
     }
 

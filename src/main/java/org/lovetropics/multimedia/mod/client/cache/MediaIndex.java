@@ -11,8 +11,8 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.JsonOps;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.FileUtil;
 import net.minecraft.util.ExtraCodecs;
+import net.minecraft.util.FileUtil;
 import org.slf4j.Logger;
 
 import java.io.BufferedReader;

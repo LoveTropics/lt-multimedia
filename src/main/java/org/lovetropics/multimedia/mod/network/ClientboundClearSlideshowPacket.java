@@ -13,7 +13,7 @@ public record ClientboundClearSlideshowPacket(
             ClientboundClearSlideshowPacket::new
     );
 
-    public static final Type<ClientboundClearSlideshowPacket> TYPE = new Type<>(MultimediaMod.location("clear_slideshow"));
+    public static final Type<ClientboundClearSlideshowPacket> TYPE = new Type<>(MultimediaMod.id("clear_slideshow"));
 
     @Override
     public Type<ClientboundClearSlideshowPacket> type() {

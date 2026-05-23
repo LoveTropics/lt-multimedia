@@ -2,16 +2,16 @@ package org.lovetropics.multimedia.mod.client.slideshow;
 
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.Nullable;
@@ -28,7 +28,7 @@ public interface SlideshowGraphics {
         return (float) Math.pow(2.0, Mth.ceil(Math.log(value) / LOG_2));
     }
 
-    static SlideshowGraphics forGui(final GuiGraphics graphics, final Font font) {
+    static SlideshowGraphics forGui(final GuiGraphicsExtractor graphics, final Font font) {
         final FrameSize frameSize = new FrameSize(graphics.guiWidth(), graphics.guiHeight());
         final FrameSize textureFrameSize = FrameSize.from(Minecraft.getInstance().getWindow());
 
@@ -49,7 +49,7 @@ public interface SlideshowGraphics {
             }
 
             @Override
-            public void blit(final ResourceLocation location, final int x, final int y, final int width, final int height, final int color) {
+            public void blit(final Identifier location, final int x, final int y, final int width, final int height, final int color) {
                 graphics.blit(RenderPipelines.GUI_TEXTURED, location, x, y, 0, 0, width, height, 1, 1, 1, 1, color);
             }
 
@@ -58,7 +58,7 @@ public interface SlideshowGraphics {
                 graphics.pose().pushMatrix();
                 graphics.pose().translate(x, y);
                 graphics.pose().scale(scale);
-                graphics.drawString(font, text, 0, 0, color);
+                graphics.text(font, text, 0, 0, color);
                 graphics.pose().popMatrix();
             }
 
@@ -70,7 +70,7 @@ public interface SlideshowGraphics {
     }
 
     @Nullable
-    static SlideshowGraphics forWorld(final PoseStack.Pose pose, final float worldWidth, final float worldHeight, final int lightCoords, final MultiBufferSource bufferSource, final Font font) {
+    static SlideshowGraphics forWorld(final PoseStack.Pose pose, final float worldWidth, final float worldHeight, final int lightCoords, final SubmitNodeCollector submitNodeCollector, final Font font) {
         final FrameSize frameSize = new FrameSize(Math.round(worldWidth * 16), Math.round(worldHeight * 16)).resizeInto(BASE_GUI_SIZE);
 
         final Vector2fc screenSizePixels = ScreenSizeCapture.sizeInScreenPixels(pose,
@@ -107,24 +107,25 @@ public interface SlideshowGraphics {
 
             @Override
             public void fill(final int x, final int y, final int width, final int height, final int color) {
-                addQuad(x, y, width, height, color, bufferSource.getBuffer(RenderType.textBackground()));
+                addQuad(x, y, width, height, color, RenderTypes.textBackground());
             }
 
             @Override
-            public void blit(final ResourceLocation location, final int x, final int y, final int width, final int height, final int color) {
-                addQuad(x, y, width, height, color, bufferSource.getBuffer(RenderType.entityTranslucent(location)));
+            public void blit(final Identifier location, final int x, final int y, final int width, final int height, final int color) {
+                addQuad(x, y, width, height, color, RenderTypes.entityTranslucent(location));
             }
 
-            private void addQuad(final float x, final float y, final float width, final float height, final int color, final VertexConsumer buffer) {
-                final float x0 = -worldWidth / 2.0f + x / frameSize.width() * worldWidth;
-                final float y0 = -worldHeight / 2.0f + y / frameSize.height() * worldHeight;
-                final float x1 = x0 + width / frameSize.width() * worldWidth;
-                final float y1 = y0 + height / frameSize.height() * worldHeight;
-                final PoseStack.Pose pose = poseStack.last();
-                buffer.addVertex(pose, x0, y0, 0.0f).setUv(0.0f, 1.0f).setLight(lightCoords).setNormal(pose, 0.0f, 0.0f, -1.0f).setColor(color).setOverlay(OverlayTexture.NO_OVERLAY);
-                buffer.addVertex(pose, x1, y0, 0.0f).setUv(1.0f, 1.0f).setLight(lightCoords).setNormal(pose, 0.0f, 0.0f, -1.0f).setColor(color).setOverlay(OverlayTexture.NO_OVERLAY);
-                buffer.addVertex(pose, x1, y1, 0.0f).setUv(1.0f, 0.0f).setLight(lightCoords).setNormal(pose, 0.0f, 0.0f, -1.0f).setColor(color).setOverlay(OverlayTexture.NO_OVERLAY);
-                buffer.addVertex(pose, x0, y1, 0.0f).setUv(0.0f, 0.0f).setLight(lightCoords).setNormal(pose, 0.0f, 0.0f, -1.0f).setColor(color).setOverlay(OverlayTexture.NO_OVERLAY);
+            private void addQuad(int x, int y, int width, int height, int color, RenderType renderType) {
+                submitNodeCollector.submitCustomGeometry(poseStack, renderType, (pose, buffer) -> {
+                    final float x0 = -worldWidth / 2.0f + (float) x / frameSize.width() * worldWidth;
+                    final float y0 = -worldHeight / 2.0f + (float) y / frameSize.height() * worldHeight;
+                    final float x1 = x0 + (float) width / frameSize.width() * worldWidth;
+                    final float y1 = y0 + (float) height / frameSize.height() * worldHeight;
+                    buffer.addVertex(pose, x0, y0, 0.0f).setUv(0.0f, 1.0f).setLight(lightCoords).setNormal(pose, 0.0f, 0.0f, -1.0f).setColor(color).setOverlay(OverlayTexture.NO_OVERLAY);
+                    buffer.addVertex(pose, x1, y0, 0.0f).setUv(1.0f, 1.0f).setLight(lightCoords).setNormal(pose, 0.0f, 0.0f, -1.0f).setColor(color).setOverlay(OverlayTexture.NO_OVERLAY);
+                    buffer.addVertex(pose, x1, y1, 0.0f).setUv(1.0f, 0.0f).setLight(lightCoords).setNormal(pose, 0.0f, 0.0f, -1.0f).setColor(color).setOverlay(OverlayTexture.NO_OVERLAY);
+                    buffer.addVertex(pose, x0, y1, 0.0f).setUv(0.0f, 0.0f).setLight(lightCoords).setNormal(pose, 0.0f, 0.0f, -1.0f).setColor(color).setOverlay(OverlayTexture.NO_OVERLAY);
+                });
                 poseStack.translate(0.0f, 0.0f, Z_OFFSET);
             }
 
@@ -137,17 +138,7 @@ public interface SlideshowGraphics {
                         0.0f
                 );
                 poseStack.scale(scale * worldWidth / frameSize.width(), -scale * worldHeight / frameSize.height(), 1.0f / 16.0f);
-                font.drawInBatch(text,
-                        0.0f,
-                        0.0f,
-                        color,
-                        true,
-                        poseStack.last().pose(),
-                        bufferSource,
-                        Font.DisplayMode.NORMAL,
-                        0,
-                        lightCoords
-                );
+                submitNodeCollector.submitText(poseStack, 0.0f, 0.0f, text, true, Font.DisplayMode.NORMAL, lightCoords, color, 0, 0);
                 poseStack.popPose();
                 poseStack.translate(0.0f, 0.0f, Z_OFFSET);
             }
@@ -173,7 +164,7 @@ public interface SlideshowGraphics {
 
     void fill(int x, int y, int width, int height, int color);
 
-    void blit(ResourceLocation location, int x, int y, int width, int height, int color);
+    void blit(Identifier location, int x, int y, int width, int height, int color);
 
     void drawText(FormattedCharSequence text, int x, int y, int color, int scale);
 

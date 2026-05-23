@@ -4,7 +4,7 @@ import com.lovetropics.lib.slideshow.SlideshowApi;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.neoforged.bus.api.IEventBus;
@@ -34,9 +34,9 @@ public class MultimediaMod {
             .updateInterval(Integer.MAX_VALUE)
     );
 
-    public static final DeferredHolder<DataComponentType<?>, DataComponentType<List<ResourceLocation>>> SLIDESHOW_VIEWER = DATA_COMPONENTS_REGISTER.registerComponentType("slideshow_viewer", b -> b
-            .persistent(ResourceLocation.CODEC.listOf())
-            .networkSynchronized(ResourceLocation.STREAM_CODEC.apply(ByteBufCodecs.list()))
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<List<Identifier>>> SLIDESHOW_VIEWER = DATA_COMPONENTS_REGISTER.registerComponentType("slideshow_viewer", b -> b
+            .persistent(Identifier.CODEC.listOf())
+            .networkSynchronized(Identifier.STREAM_CODEC.apply(ByteBufCodecs.list()))
             .cacheEncoding()
     );
 
@@ -53,8 +53,8 @@ public class MultimediaMod {
         SlideshowApi.setSlideshowManager(slideshowManager);
     }
 
-    public static ResourceLocation location(final String path) {
-        return ResourceLocation.fromNamespaceAndPath(ID, path);
+    public static Identifier id(final String path) {
+        return Identifier.fromNamespaceAndPath(ID, path);
     }
 
     public static ServerSlideshowManager slideshowManager() {
