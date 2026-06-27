@@ -6,7 +6,7 @@ import com.google.gson.JsonSyntaxException;
 import com.mojang.logging.LogUtils;
 import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.JsonOps;
-import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.resources.FileToIdConverter;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.RegistryOps;
@@ -17,6 +17,7 @@ import net.minecraft.util.Util;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.AddServerReloadListenersEvent;
+import net.neoforged.neoforge.resource.ContextAwareReloadListener;
 import org.jetbrains.annotations.Nullable;
 import org.lovetropics.multimedia.mod.MediaFile;
 import org.lovetropics.multimedia.mod.MultimediaMod;
@@ -45,16 +46,18 @@ public class SlideshowRegistry {
 
     @SubscribeEvent
     public static void addReloadListener(final AddServerReloadListenersEvent event) {
-        final RegistryAccess registries = event.getRegistryAccess();
-        event.addListener(MultimediaMod.id("slideshows"), (sharedState, taskExecutor, barrier, reloadExecutor) ->
-                load(registries, sharedState.resourceManager(), taskExecutor)
+        event.addListener(MultimediaMod.id("slideshows"), new ContextAwareReloadListener() {
+            @Override
+            public CompletableFuture<Void> reload(SharedState currentReload, Executor taskExecutor, PreparationBarrier barrier, Executor reloadExecutor) {
+                return load(getRegistryLookup(), currentReload.resourceManager(), taskExecutor)
                         .thenCompose(barrier::wait)
                         .thenAcceptAsync(slideshows -> {
                             REGISTRY.clear();
                             slideshows.forEach(holder -> REGISTRY.put(holder.id(), holder));
                             REGISTRY.putAll(IMPORTED_REGISTRY);
-                        }, reloadExecutor)
-        );
+                        }, reloadExecutor);
+            }
+        });
     }
 
     public static Identifier importSimpleVideo(final Identifier name, final URI url, final double duration) {
@@ -74,8 +77,8 @@ public class SlideshowRegistry {
         return id;
     }
 
-    private static CompletableFuture<List<SlideshowHolder>> load(final RegistryAccess registryAccess, final ResourceManager resourceManager, final Executor executor) {
-        final RegistryOps<JsonElement> ops = registryAccess.createSerializationContext(JsonOps.INSTANCE);
+    private static CompletableFuture<List<SlideshowHolder>> load(final HolderLookup.Provider registries, final ResourceManager resourceManager, final Executor executor) {
+        final RegistryOps<JsonElement> ops = registries.createSerializationContext(JsonOps.INSTANCE);
         return CompletableFuture.supplyAsync(() -> listEntries(ops, resourceManager, executor), executor).thenCompose(Function.identity());
     }
 

@@ -65,8 +65,8 @@ public class FullScreenSlideshow implements AutoCloseable {
 
     private void openScreen() {
         final Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.screen == null) {
-            minecraft.setScreen(new CaptureScreen());
+        if (minecraft.gui.screen() == null) {
+            minecraft.gui.setScreen(new CaptureScreen());
         }
     }
 
@@ -104,13 +104,13 @@ public class FullScreenSlideshow implements AutoCloseable {
         @Override
         public boolean keyPressed(final KeyEvent event) {
             if (event.key() == InputConstants.KEY_ESCAPE) {
-                minecraft.pushGuiLayer(new PauseScreen(true));
+                minecraft.gui.pushScreenLayer(new PauseScreen(true));
                 return true;
             } else if (minecraft.options.keyChat.matches(event)) {
-                minecraft.gui.getChat().openScreen(ChatComponent.ChatMethod.MESSAGE, ChatScreen::new);
+                minecraft.gui.hud.getChat().openScreen(ChatComponent.ChatMethod.MESSAGE, ChatScreen::new);
                 return true;
             } else if (minecraft.options.keyCommand.matches(event)) {
-                minecraft.gui.getChat().openScreen(ChatComponent.ChatMethod.COMMAND, ChatScreen::new);
+                minecraft.gui.hud.getChat().openScreen(ChatComponent.ChatMethod.COMMAND, ChatScreen::new);
                 return true;
             }
             return super.keyPressed(event);

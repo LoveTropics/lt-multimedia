@@ -40,7 +40,7 @@ public class ClientSlideshowManager {
     public void registerOverlays(final RegisterGuiLayersEvent event) {
         event.registerAboveAll(MultimediaMod.id("slideshow"), (graphics, deltaTracker) -> {
             final Minecraft minecraft = Minecraft.getInstance();
-            if (fullScreenSlideshow != null && !fullScreenSlideshow.shouldRenderOver(minecraft.screen)) {
+            if (fullScreenSlideshow != null && !fullScreenSlideshow.shouldRenderOver(minecraft.gui.screen())) {
                 final float partialTicks = deltaTracker.getGameTimeDeltaPartialTick(true);
                 fullScreenSlideshow.draw(SlideshowGraphics.forGui(graphics, minecraft.font), partialTicks);
             }
@@ -51,7 +51,7 @@ public class ClientSlideshowManager {
     public void onRenderScreen(final ScreenEvent.Render.Post event) {
         // Only render over the topmost layer
         final Screen screen = event.getScreen();
-        if (screen != Minecraft.getInstance().screen) {
+        if (screen != Minecraft.getInstance().gui.screen()) {
             return;
         }
         if (fullScreenSlideshow != null && fullScreenSlideshow.shouldRenderOver(screen)) {

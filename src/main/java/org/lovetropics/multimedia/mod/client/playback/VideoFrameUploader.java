@@ -1,14 +1,14 @@
 package org.lovetropics.multimedia.mod.client.playback;
 
+import com.mojang.blaze3d.GpuFormat;
 import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.buffers.GpuFence;
-import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.GpuDevice;
 import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.TextureFormat;
 import org.lovetropics.multimedia.DecoderException;
 import org.lovetropics.multimedia.VideoFrame;
-import org.lovetropics.multimedia.mod.client.GpuExtensions;
 
 import javax.annotation.Nullable;
 import java.util.Objects;
@@ -207,7 +207,7 @@ public class VideoFrameUploader implements AutoCloseable {
         private volatile FrameSize frameSize;
 
         @Nullable
-        private volatile GpuBuffer.MappedView mappedView;
+        private volatile GpuBufferSlice.MappedView mappedView;
         private volatile double presentTime;
 
         private final AtomicReference<State> state = new AtomicReference<>(State.READY_FOR_WRITE);
@@ -240,7 +240,7 @@ public class VideoFrameUploader implements AutoCloseable {
         }
 
         private GpuBuffer createBuffer(final GpuDevice device, final FrameSize frameSize) {
-            final int sizeBytes = frameSize.width() * frameSize.height() * TextureFormat.RGBA8.pixelSize();
+            final int sizeBytes = frameSize.width() * frameSize.height() * GpuFormat.RGBA8_UNORM.blockSize();
             return device.createBuffer(() -> "Video frame buffer", GpuBuffer.USAGE_COPY_SRC | GpuBuffer.USAGE_MAP_WRITE | GpuBuffer.USAGE_HINT_CLIENT_STORAGE, sizeBytes);
         }
 
@@ -253,7 +253,7 @@ public class VideoFrameUploader implements AutoCloseable {
                 buffer = createBuffer(device, requestedFrameSize);
                 frameSize = requestedFrameSize;
             }
-            mappedView = device.createCommandEncoder().mapBuffer(buffer, false, true);
+            mappedView = buffer.map(false, true);
         }
 
         public void tick(final GpuDevice device, final FrameSize requestedFrameSize) {
@@ -284,7 +284,7 @@ public class VideoFrameUploader implements AutoCloseable {
             if (!tryUpdateState(State.READY_FOR_WRITE, State.WRITE_BEGIN)) {
                 return false;
             }
-            final GpuBuffer.MappedView mappedView = Objects.requireNonNull(this.mappedView);
+            final GpuBufferSlice.MappedView mappedView = Objects.requireNonNull(this.mappedView);
             presentTime = frame.presentTime();
             frame.unpackPixels(frameSize.width(), frameSize.height(), mappedView.data());
             mappedView.data().flip();
@@ -302,11 +302,12 @@ public class VideoFrameUploader implements AutoCloseable {
 
         public void copyTo(final GpuDevice device, final GpuTexture texture) {
             checkState(State.READY_TO_PRESENT);
-            GpuExtensions.copyBufferToTexture(buffer, texture, 0, 0, frameSize.width(), frameSize.height(), NativeImage.Format.RGBA);
+            CommandEncoder commandEncoder = device.createCommandEncoder();
+            commandEncoder.copyBufferToTexture(buffer.slice(), 0, 0, frameSize.width(), frameSize.height(), texture, 0, 0, frameSize.width(), frameSize.height(), 0, 0);
             if (recycleFence != null) {
                 recycleFence.close();
             }
-            recycleFence = device.createCommandEncoder().createFence();
+            recycleFence = commandEncoder.createFence();
         }
 
         public void recycle(final GpuDevice device, final FrameSize requestedFrameSize) {
@@ -350,7 +351,7 @@ public class VideoFrameUploader implements AutoCloseable {
                 state = this.state.get();
             }
 
-            final GpuBuffer.MappedView mappedView = this.mappedView;
+            final GpuBufferSlice.MappedView mappedView = this.mappedView;
             this.mappedView = null;
             if (mappedView != null) {
                 mappedView.close();

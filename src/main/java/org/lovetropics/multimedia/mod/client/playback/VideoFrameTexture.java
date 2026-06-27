@@ -1,10 +1,10 @@
 package org.lovetropics.multimedia.mod.client.playback;
 
+import com.mojang.blaze3d.GpuFormat;
 import com.mojang.blaze3d.systems.GpuDevice;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.TextureFormat;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.resources.Identifier;
@@ -44,7 +44,7 @@ public class VideoFrameTexture extends AbstractTexture {
         if (textureView != null) {
             textureView.close();
         }
-        texture = device.createTexture("Video", GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_COPY_DST, TextureFormat.RGBA8, frameSize.width(), frameSize.height(), 1, 1);
+        texture = device.createTexture("Video", GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_COPY_DST, GpuFormat.RGBA8_UNORM, frameSize.width(), frameSize.height(), 1, 1);
         textureView = device.createTextureView(texture);
 
         return texture;

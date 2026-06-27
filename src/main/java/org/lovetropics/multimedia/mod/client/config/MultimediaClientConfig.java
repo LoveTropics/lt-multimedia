@@ -17,7 +17,6 @@ import net.neoforged.neoforge.common.ModConfigSpec.DoubleValue;
 import org.lovetropics.multimedia.mod.MultimediaMod;
 
 import java.util.Optional;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 public class MultimediaClientConfig {
@@ -47,7 +46,7 @@ public class MultimediaClientConfig {
                 MultimediaClientConfig::percentOrOff,
                 new OptionInstance.ValueSet<>() {
                     @Override
-                    public Function<OptionInstance<Double>, AbstractWidget> createButton(final OptionInstance.TooltipSupplier<Double> tooltipSupplier, final Options options, final int x, final int y, final int width, final Consumer<Double> onValueChanged) {
+                    public Function<OptionInstance<Double>, AbstractWidget> createButton(final OptionInstance.TooltipSupplier<Double> tooltip, final Options options, final int x, final int y, final int width, final OptionInstance.ValueUpdateListener<? super Double> onValueChanged) {
                         return option -> new VolumeSlider(options, x, y, width, option);
                     }
 

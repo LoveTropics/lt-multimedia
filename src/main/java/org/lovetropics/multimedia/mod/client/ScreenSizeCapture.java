@@ -33,7 +33,7 @@ public class ScreenSizeCapture {
         }
 
         final Matrix4f modelToNdc = new Matrix4f(CAPTURED_PROJECTION)
-                .mul(RenderSystem.getModelViewMatrix())
+                .mul(RenderSystem.getModelViewStack())
                 .mul(pose.pose());
 
         final Vector3f minNdc = new Vector3f(Float.MAX_VALUE);
