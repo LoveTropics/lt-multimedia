@@ -81,8 +81,8 @@ public interface PreparedSlide extends AutoCloseable {
     private static Image uploadImage(final NativeImage image, final SlideDecorations decorations) {
         final DynamicTexture texture = new DynamicTexture(() -> "Image slide", image);
         final FrameSize imageSize = new FrameSize(image.getWidth(), image.getHeight());
-        // We don't need to keep the image CPU-side now that we've uploaded it
-        texture.setPixels(null);
+        // We don't need to keep the whole image CPU-side now that we've uploaded it
+        texture.setPixels(new NativeImage(1, 1, false));
         final Identifier textureId = MultimediaMod.id("image_slide_" + Image.NEXT_ID.getAndIncrement());
         Minecraft.getInstance().getTextureManager().register(textureId, texture);
         return new Image(textureId, texture, imageSize, PreparedSlideDecorations.prepare(decorations));
