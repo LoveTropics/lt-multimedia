@@ -95,6 +95,8 @@ public interface SlideshowGraphics {
         return new SlideshowGraphics() {
             private static final float Z_OFFSET = 0.001f;
 
+            private int order;
+
             @Override
             public FrameSize frameSize() {
                 return frameSize;
@@ -116,7 +118,7 @@ public interface SlideshowGraphics {
             }
 
             private void addQuad(int x, int y, int width, int height, int color, RenderType renderType) {
-                submitNodeCollector.submitCustomGeometry(poseStack, renderType, (pose, buffer) -> {
+                submitNodeCollector.order(order++).submitCustomGeometry(poseStack, renderType, (pose, buffer) -> {
                     final float x0 = -worldWidth / 2.0f + (float) x / frameSize.width() * worldWidth;
                     final float y0 = -worldHeight / 2.0f + (float) y / frameSize.height() * worldHeight;
                     final float x1 = x0 + (float) width / frameSize.width() * worldWidth;
@@ -138,7 +140,7 @@ public interface SlideshowGraphics {
                         0.0f
                 );
                 poseStack.scale(scale * worldWidth / frameSize.width(), -scale * worldHeight / frameSize.height(), 1.0f / 16.0f);
-                submitNodeCollector.submitText(poseStack, 0.0f, 0.0f, text, true, Font.DisplayMode.NORMAL, lightCoords, color, 0, 0);
+                submitNodeCollector.order(order++).submitText(poseStack, 0.0f, 0.0f, text, true, Font.DisplayMode.NORMAL, lightCoords, color, 0, 0);
                 poseStack.popPose();
                 poseStack.translate(0.0f, 0.0f, Z_OFFSET);
             }
