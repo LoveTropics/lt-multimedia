@@ -51,8 +51,9 @@ public class ScreenSizeCapture {
             maxNdc.max(vertexNdc);
         }
 
+        final boolean zZeroToOne = RenderSystem.getDevice().getDeviceInfo().isZZeroToOne();
         // Fully behind the camera
-        if (maxNdc.z() < 0.0f) {
+        if (maxNdc.z() < (zZeroToOne ? 0.0f : -1.0f)) {
             return null;
         }
 
