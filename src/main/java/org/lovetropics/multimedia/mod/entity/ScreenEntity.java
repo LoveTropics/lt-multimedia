@@ -50,6 +50,7 @@ public class ScreenEntity extends Entity {
     private static final EntityDataAccessor<Float> DATA_WIDTH = SynchedEntityData.defineId(ScreenEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> DATA_HEIGHT = SynchedEntityData.defineId(ScreenEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> DATA_AUDIO_RADIUS = SynchedEntityData.defineId(ScreenEntity.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Boolean> DATA_TRANSPARENT = SynchedEntityData.defineId(ScreenEntity.class, EntityDataSerializers.BOOLEAN);
 
     private static final Codec<AABB> AABB_CODEC = Codec.DOUBLE.listOf(6, 6).xmap(
             coordinates -> new AABB(coordinates.get(0), coordinates.get(1), coordinates.get(2), coordinates.get(3), coordinates.get(4), coordinates.get(5)),
@@ -293,6 +294,8 @@ public class ScreenEntity extends Entity {
         output.putBoolean("requires_item_to_view", requiresItemToView);
 
         output.storeNullable("inside_box_to_view", AABB_CODEC, insideBoxToView);
+
+        output.putBoolean("transparent", isTransparent());
     }
 
     @Override
@@ -310,6 +313,12 @@ public class ScreenEntity extends Entity {
         requiresItemToView = input.getBooleanOr("requires_item_to_view", false);
 
         insideBoxToView = input.read("inside_box_to_view", AABB_CODEC).orElse(null);
+
+        entityData.set(DATA_TRANSPARENT, input.getBooleanOr("transparent", false));
+    }
+
+    public boolean isTransparent() {
+        return entityData.get(DATA_TRANSPARENT);
     }
 
     @Override

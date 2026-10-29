@@ -11,6 +11,7 @@ public class ScreenRenderState extends EntityRenderState {
     public float xRot;
     public float width = ScreenEntity.DEFAULT_WIDTH;
     public float height = ScreenEntity.DEFAULT_HEIGHT;
+    public boolean transparent;
     @Nullable
     public SlideshowRenderState slideshowState;
 }

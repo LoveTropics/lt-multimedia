@@ -35,7 +35,9 @@ public class ScreenRenderer extends EntityRenderer<ScreenEntity, ScreenRenderSta
 
         final SlideshowGraphics graphics = SlideshowGraphics.forWorld(poseStack.last(), state.width, state.height, LightCoordsUtil.FULL_BRIGHT, submitNodeCollector, font);
         if (graphics != null) {
-            graphics.fill(0, 0, graphics.width(), graphics.height(), CommonColors.BLACK);
+            if (!state.transparent) {
+                graphics.fill(0, 0, graphics.width(), graphics.height(), CommonColors.BLACK);
+            }
             if (state.slideshowState != null) {
                 state.slideshowState.draw(graphics);
             }
@@ -56,6 +58,7 @@ public class ScreenRenderer extends EntityRenderer<ScreenEntity, ScreenRenderSta
         state.xRot = entity.getXRot(partialTick);
         state.width = entity.getWidth();
         state.height = entity.getHeight();
+        state.transparent = entity.isTransparent();
 
         final ScreenClientState screenState = slideshowManager.getScreenState(entity);
         state.slideshowState = screenState != null ? screenState.extractRenderState(partialTick) : null;
