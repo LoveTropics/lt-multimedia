@@ -14,18 +14,12 @@ group = group_id
 version = mod_version
 
 def env = System.getenv()
-if (env.GITHUB_RUN_NUMBER) {
-    version = "$mod_version.${env.GITHUB_RUN_NUMBER}"
-} else {
-    version = "$mod_version.0-SNAPSHOT"
-}
+def patch = env.GITHUB_RUN_NUMBER ? env.GITHUB_RUN_NUMBER : '0'
+def suffix = env.RELEASE ? '' : '-SNAPSHOT'
+version = "$mod_version.${patch}${suffix}"
 
 ext {
-    if (env.GITHUB_RUN_NUMBER) {
-        libVersion = "$project.lib_version.${env.GITHUB_RUN_NUMBER}"
-    } else {
-        libVersion = "$project.lib_version.0-SNAPSHOT"
-    }
+    libVersion = "$project.lib_version.${patch}${suffix}"
 }
 
 neoForge {
