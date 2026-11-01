@@ -108,7 +108,7 @@ jobs:
       - name: Build mod and publish with Gradle
         env:
           CROSS_PLATFORM_BUILD: true
-          RELEASE: true
+          RELEASE_VERSION: true
           MAVEN_URL: ${{ secrets.LT_MAVEN_RELEASES_URL }}
           MAVEN_USERNAME: ${{ secrets.LT_MAVEN_USER }}
           MAVEN_PASSWORD: ${{ secrets.LT_MAVEN_PASS }}

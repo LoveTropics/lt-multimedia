@@ -15,7 +15,7 @@ version = mod_version
 
 def env = System.getenv()
 def patch = env.GITHUB_RUN_NUMBER ? env.GITHUB_RUN_NUMBER : '0'
-def suffix = env.RELEASE ? '' : '-SNAPSHOT'
+def suffix = env.RELEASE_VERSION ? '' : '-SNAPSHOT'
 version = "$mod_version.${patch}${suffix}"
 
 ext {
