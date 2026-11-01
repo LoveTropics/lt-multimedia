@@ -71,6 +71,11 @@ dependencies {
     if (env.CROSS_PLATFORM_BUILD) {
         NativeBuildPlatform.values().each { final platform ->
             final def nativeFile = platform.getArtifactFile(layout.projectDirectory, 'multimedia-lib', project.ext.libVersion)
+            if (nativeFile.exists()) {
+                logger.info("Including native for $platform from $nativeFile")
+            } else {
+                logger.log(LogLevel.WARN, "Missing native for $platform at $nativeFile")
+            }
             shadeNative files(nativeFile.path)
         }
     } else {
