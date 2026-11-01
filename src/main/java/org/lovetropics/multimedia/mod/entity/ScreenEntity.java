@@ -46,6 +46,7 @@ public class ScreenEntity extends Entity {
     public static final float DEFAULT_WIDTH = 4.0f;
     public static final float DEFAULT_HEIGHT = 2.25f;
     public static final float DEFAULT_AUDIO_RADIUS = 64.0f;
+    public static final boolean DEFAULT_TRANSPARENT = false;
 
     private static final EntityDataAccessor<Float> DATA_WIDTH = SynchedEntityData.defineId(ScreenEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> DATA_HEIGHT = SynchedEntityData.defineId(ScreenEntity.class, EntityDataSerializers.FLOAT);
@@ -128,6 +129,7 @@ public class ScreenEntity extends Entity {
         builder.define(DATA_WIDTH, DEFAULT_WIDTH);
         builder.define(DATA_HEIGHT, DEFAULT_HEIGHT);
         builder.define(DATA_AUDIO_RADIUS, DEFAULT_AUDIO_RADIUS);
+        builder.define(DATA_TRANSPARENT, DEFAULT_TRANSPARENT);
     }
 
     public @Nullable SlideshowInstanceHandle asHandle() {
