@@ -28,7 +28,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build
-        uses: ./.github/workflows/common/natives/windows
+        uses: ./.github/actions/natives/windows
         with:
           arch: ${{ matrix.arch }}
           target: ${{ matrix.target }}
@@ -49,13 +49,14 @@ jobs:
 
     name: Linux Natives (${{ matrix.arch }})
     runs-on: ubuntu-latest
+    container: ubuntu:22.04
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Build
-        uses: ./.github/workflows/common/natives/linux
+        uses: ./.github/actions/natives/linux
         with:
           arch: ${{ matrix.arch }}
           target: ${{ matrix.target }}
@@ -80,7 +81,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build
-        uses: ./.github/workflows/common/natives/macos
+        uses: ./.github/actions/natives/macos
         with:
           arch: ${{ matrix.arch }}
           target: ${{ matrix.target }}
@@ -101,7 +102,7 @@ jobs:
           merge-multiple: true
           path: bin/
 
-      - uses: ./.github/workflows/common/java-and-gradle
+      - uses: ./.github/actions/java-and-gradle
         with:
           java_arch: x64
 
