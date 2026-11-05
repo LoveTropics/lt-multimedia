@@ -92,7 +92,7 @@ public class FullScreenSlideshow implements AutoCloseable {
         public void tick() {
             super.tick();
             if (closed) {
-                onClose();
+                minecraft.gui.clearScreenLayers();
             }
         }
 
